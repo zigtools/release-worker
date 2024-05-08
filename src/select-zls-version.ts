@@ -1,0 +1,197 @@
+import assert from "node:assert";
+import { Env } from "./env";
+import { SemanticVersion } from "./semantic-version";
+import { D2JsonData } from "./shared";
+
+/**
+ * Similar to https://ziglang.org/download/index.json
+ */
+export interface SelectZLSVersionResponse {
+  version: string;
+  date: string;
+  [artifact: string]: ArtifactEntry | undefined | string;
+}
+
+export interface ArtifactEntry {
+  tarball: string;
+  shasum: string;
+  size: string;
+}
+
+// export enum SelectZLSVersionFailureCode {
+//   /**
+//    * The Zig version is less than or equal to 0.9.0 which means that no tagged ZLS release exists.
+//    */
+//   UnsupportedTaggedRelease,
+//   /**
+//    * The Zig version would require a tagged ZLS release that doesn't exist, **yet**.
+//    */
+//   MissingTaggedRelease,
+//   /**
+//    * The Zig version is a development/nightly build that has no compatible ZLS build.
+//    */
+//   UnsupportedDevelopmentBuild,
+//   /**
+//    * The Zig version is a development/nightly build that has not been tested by ZLS's CI to be compatible.
+//    */
+//   UntestedDevelopmentBuild,
+// }
+
+/**
+ * `${ENDPOINT}/select-zls-version?zig_version=0.12.0`
+ */
+export async function handleSelectZLSVersion(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response("method must be 'GET'", {
+      status: 405, // Method Not Allowed
+    });
+  }
+
+  const url = new URL(request.url);
+  const zigVersionString = url.searchParams.get("zig_version");
+
+  if (zigVersionString === null) {
+    return new Response("Expected query component with key 'zig_version'!", {
+      status: 400, // Bad Request
+    });
+  }
+
+  const zigVersion = SemanticVersion.parse(zigVersionString);
+
+  if (!zigVersion) {
+    return new Response(
+      `Query component 'zig_version' with value '${zigVersionString}' is not a valid semantic version!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
+
+  let selectedVersion: D2JsonData | null = null;
+  if (zigVersion.isRelease) {
+    selectedVersion = await selectOnTaggedRelease(env, zigVersion);
+  } else {
+    selectedVersion = await selectOnDevelopmentBuild(env, zigVersion);
+  }
+
+  let response: SelectZLSVersionResponse | null = null;
+  if (selectedVersion?.date != null && selectedVersion.artifacts.length !== 0) {
+    const targets: Record<string, ArtifactEntry> = {};
+    for (const artifact of selectedVersion.artifacts) {
+      targets[`${artifact.arch}-${artifact.os}`] = {
+        tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
+        shasum: artifact.file_shasum,
+        size: artifact.file_size.toString(),
+      };
+    }
+
+    response = {
+      version: selectedVersion.zlsVersion,
+      date: new Date(selectedVersion.date).toISOString().slice(0, 10),
+      ...targets,
+    };
+  }
+
+  return Response.json(response, {
+    headers: {
+      "cache-control": "no-cache",
+      // "cache-control": "max-age=1500", // 25 minutes
+    },
+  });
+}
+
+async function selectOnTaggedRelease(
+  env: Env,
+  zigVersion: SemanticVersion,
+): Promise<D2JsonData | null> {
+  assert(zigVersion.isRelease);
+
+  const selectedRelease = await env.ZIGTOOLS_DB.prepare(
+    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionPatch DESC",
+  )
+    .bind(zigVersion.major, zigVersion.minor)
+    .first<{ JsonData: string }>();
+
+  if (!selectedRelease) return null;
+  return JSON.parse(selectedRelease.JsonData) as D2JsonData;
+}
+
+/**
+ * This code is ported over from `https://gist.github.com/Techatrix/02ce258460d4ca1c8424e600458575b0`.
+ * It has not yet been rigorously tested and should be adjusted to take into account the `testedZigVersion` field.
+ */
+async function selectOnDevelopmentBuild(
+  env: Env,
+  zigVersion: SemanticVersion,
+): Promise<D2JsonData | null> {
+  assert(!zigVersion.isRelease);
+
+  const releases = await env.ZIGTOOLS_DB.prepare(
+    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
+  )
+    .bind(zigVersion.major, zigVersion.minor)
+    .all<{ JsonData: string }>();
+
+  if (!releases.results.length) return null;
+
+  const oldestRelease = releases.results[0];
+  const oldestReleaseData = JSON.parse(oldestRelease.JsonData) as D2JsonData;
+  const oldestReleaseMinimumRuntimeZigVersion = SemanticVersion.parse(
+    oldestReleaseData.minimumRuntimeZigVersion,
+  );
+  assert(oldestReleaseMinimumRuntimeZigVersion);
+
+  if (
+    SemanticVersion.order(zigVersion, oldestReleaseMinimumRuntimeZigVersion) ==
+    -1
+  )
+    return null;
+
+  let newest_compatible_entry_index = 0;
+  /** will store the highest Zig version with which a ZLS release has been built with */
+  let maxmimumBuildVersion: SemanticVersion | null = null;
+
+  releases.results.forEach((entry, index) => {
+    const data = JSON.parse(entry.JsonData) as D2JsonData;
+    const minimumRuntimeZigVersion = SemanticVersion.parse(
+      data.minimumRuntimeZigVersion,
+    );
+    assert(minimumRuntimeZigVersion);
+
+    assert(data.zigVersion);
+    const entryZigVersion = SemanticVersion.parse(data.zigVersion);
+    assert(entryZigVersion);
+
+    switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
+      // the minimum build version may not be monotonically increasing (i.e a newer release has lower minimum build version) so keep searching
+      case -1:
+        return;
+      case 0:
+      case 1:
+        newest_compatible_entry_index = index;
+        break;
+    }
+
+    // the upper bound is usually higher than the version with which ZLS has been built but it is better than having no upper bound.
+    // TODO a more accurate upper bound could be determined by using ZLS's scheduled GitHub CI to periodically bumb the version with which ZLS has been built.
+    if (maxmimumBuildVersion) {
+      switch (SemanticVersion.order(maxmimumBuildVersion, entryZigVersion)) {
+        case -1:
+          maxmimumBuildVersion = entryZigVersion;
+          break;
+        case 0:
+        case 1:
+          break;
+      }
+    } else {
+      maxmimumBuildVersion = entryZigVersion;
+    }
+  });
+
+  assert(newest_compatible_entry_index < releases.results.length);
+  const selectedEntry = releases.results[newest_compatible_entry_index];
+  return JSON.parse(selectedEntry.JsonData) as D2JsonData;
+}
