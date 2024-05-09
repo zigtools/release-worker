@@ -301,6 +301,12 @@ export async function handlePublish(
     });
   }
 
+  if (zlsVersion.isRelease && artifacts.length === 0) {
+    return new Response(`A new tagged release of ZLS must have artifacts!`, {
+      status: 400, // Bad Request
+    });
+  }
+
   if (
     artifacts.length !== 0 &&
     !artifacts.every((artifact) => artifact.version === artifacts[0].version)

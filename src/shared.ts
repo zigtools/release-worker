@@ -19,7 +19,7 @@ export interface D2JsonData {
   minimumRuntimeZigVersion: string;
   /** Always contains the `zigVersion` if it is available. */
   testedZigVersion: Record<string, boolean>;
-  /** no artifacts indicates a failure */
+  /** no artifacts indicates a failure. Never empty when `zlsVersion.isRelease`. */
   artifacts: ReleaseArtifact[];
 }
 
