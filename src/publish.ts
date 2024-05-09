@@ -176,6 +176,17 @@ export async function handlePublish(
     );
   }
 
+  if (!zlsVersion.isRelease && zlsVersion.patch != 0) {
+    // We order development build by their commt height.
+    // A new patch resets the commit height and could cause the search algorithm to failed.
+    return new Response(
+      `Publishing a development build of ZLS ('${zlsVersionString}') where the patch is not 0 is unsupported.`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
+
   const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|zip)$/;
   const artifacts: ReleaseArtifact[] = [];
   const artifact_blobs: Blob[] = [];
