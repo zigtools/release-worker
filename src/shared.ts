@@ -1,6 +1,10 @@
+import { Buffer } from "node:buffer";
 import { assert } from "vitest";
 import { Env } from "./env";
 import { SemanticVersion } from "./semantic-version";
+
+export const xzMagicNumber = Buffer.from("FD377A585A00", "hex");
+export const zipMagicNumber = Buffer.from("504B0304", "hex");
 
 export interface D2JsonData {
   /** unix timestamp; only set when `targets.length !== 0` */

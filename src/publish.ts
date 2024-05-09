@@ -1,7 +1,13 @@
 import { Buffer } from "node:buffer";
+import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
 import { Env } from "./env";
-import { D2JsonData, ReleaseArtifact } from "./shared";
+import {
+  D2JsonData,
+  ReleaseArtifact,
+  xzMagicNumber,
+  zipMagicNumber,
+} from "./shared";
 import { SemanticVersion } from "./semantic-version";
 
 function timingSafeEqual(a: Buffer, b: Buffer): boolean {
@@ -106,6 +112,14 @@ function expectSemverFormItem(
   }
 
   return [versionString, semver, null];
+}
+
+function stringifyMagicNumber(magicNumber: Uint8Array): string {
+  return magicNumber.reduce<string>(
+    (previous, current) =>
+      previous + (previous.length === 0 ? "" : " ") + current.toString(16),
+    "",
+  );
 }
 
 export async function handlePublish(
@@ -221,10 +235,21 @@ export async function handlePublish(
     const version = match[3];
     const extension = match[4] as "tar.xz" | "zip";
 
-    const valueString: string =
-      typeof value === "string" ? value : await value.text();
-    const shasum = createHash("sha256").update(valueString).digest("hex");
-    const size = valueString.length;
+    let file_size: number;
+    const file_hash = createHash("sha256");
+
+    if (typeof value === "string") {
+      return new Response(`artifact '${key}' must be encoded as a file!`, {
+        status: 400, // Bad Request
+      });
+    } else {
+      file_size = value.size;
+      await pipeline(value.stream(), file_hash);
+    }
+
+    // console.log(
+    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${file_hash.digest("hex")}, size=${file_size.toString()}`,
+    // );
 
     if (!SemanticVersion.parse(version)) {
       return new Response(
@@ -235,19 +260,38 @@ export async function handlePublish(
       );
     }
 
-    // console.log(
-    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${shasum}, size=${size.toString()}`,
-    // );
+    let expectedMagicNumber: Buffer;
+    switch (extension) {
+      case "tar.xz":
+        expectedMagicNumber = xzMagicNumber;
+        break;
+      case "zip":
+        expectedMagicNumber = zipMagicNumber;
+        break;
+    }
 
-    artifact_blobs.push(typeof value === "string" ? new Blob([value]) : value);
+    const actualMagicNumber: Uint8Array = new Uint8Array(
+      await value.slice(0, expectedMagicNumber.byteLength).arrayBuffer(),
+    );
+
+    if (!expectedMagicNumber.equals(actualMagicNumber)) {
+      return new Response(
+        `artifact '${key}' should have the magic number ${stringifyMagicNumber(expectedMagicNumber)} but got ${stringifyMagicNumber(actualMagicNumber)}!`,
+        {
+          status: 400, // Bad Request
+        },
+      );
+    }
+
+    artifact_blobs.push(value);
 
     artifacts.push({
       os: os,
       arch: arch,
       version: version,
       extension: extension,
-      file_shasum: shasum,
-      file_size: size,
+      file_shasum: file_hash.digest("hex"),
+      file_size: file_size,
     });
   }
 

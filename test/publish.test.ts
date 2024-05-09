@@ -1,7 +1,12 @@
 import { env, SELF } from "cloudflare:test";
 import { createHash } from "node:crypto";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
-import { D2JsonData, searchZLSRelease } from "../src/shared";
+import {
+  D2JsonData,
+  searchZLSRelease,
+  xzMagicNumber,
+  zipMagicNumber,
+} from "../src/shared";
 import { handlePublish } from "../src/publish";
 
 async function sendPublishForm(form: FormData): Promise<Response> {
@@ -176,6 +181,50 @@ describe("/v1/publish", () => {
       }
     });
 
+    test.each<["xz" | "zip", Uint8Array, "ok" | "bad"]>([
+      ["xz", new Uint8Array(xzMagicNumber), "ok"],
+      ["xz", new Uint8Array(zipMagicNumber), "bad"],
+      ["xz", new Uint8Array([1, 2, 3, 4]), "bad"],
+      ["zip", new Uint8Array(zipMagicNumber), "ok"],
+      ["zip", new Uint8Array(xzMagicNumber), "bad"],
+      ["zip", new Uint8Array([1, 2, 3, 4]), "bad"],
+    ])(
+      "validate file magic number: %s %s %s",
+      async (extension, body, expected) => {
+        const fileName =
+          extension == "xz"
+            ? "zls-x86_64-linux-0.1.0.tar.xz"
+            : "zls-x86_64-windows-0.1.0.zip";
+        const response = await sendPublish({
+          zlsVersion: "0.1.0",
+          zigVersion: "0.1.0",
+          artifacts: [[fileName, new Blob([body])]],
+        });
+
+        if (expected === "ok") {
+          expect(await response.text()).toBe("");
+          expect(response.status).toBe(200);
+        } else {
+          expect(await response.text()).contains(
+            `artifact '${fileName}' should have the magic number`,
+          );
+          expect(response.status).toBe(400);
+        }
+      },
+    );
+
+    test("validate file magic number response body", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [["zls-x86_64-linux-0.1.0.tar.xz", new Blob(["binary1"])]],
+      });
+      expect(await response.text()).toBe(
+        "artifact 'zls-x86_64-linux-0.1.0.tar.xz' should have the magic number fd 37 7a 58 5a 0 but got 62 69 6e 61 72 79!",
+      );
+      expect(response.status).toBe(400);
+    });
+
     test.each<[string, "ok" | "bad"]>([
       ["", "bad"],
       ["some string", "bad"],
@@ -189,9 +238,19 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [[body, new Blob(["binary1"])]],
+        artifacts: [
+          [
+            body,
+            new Blob([
+              body.endsWith(".zip") ? zipMagicNumber : xzMagicNumber,
+              "binary1",
+            ]),
+          ],
+        ],
       });
+
       if (expected === "ok") {
+        expect(await response.text()).toBe("");
         expect(response.status).toBe(200);
       } else {
         expect(response.status).toBe(400);
@@ -213,10 +272,14 @@ describe("/v1/publish", () => {
           zlsVersion: zlsVersion,
           zigVersion: zigVersion,
           artifacts: [
-            [`zls-x86_64-linux-${zlsVersion}.tar.xz`, new Blob(["binary1"])],
+            [
+              `zls-x86_64-linux-${zlsVersion}.tar.xz`,
+              new Blob([xzMagicNumber, "binary1"]),
+            ],
           ],
         });
         if (expected === "ok") {
+          expect(await response.text()).toBe("");
           expect(response.status).toBe(200);
         } else {
           expect(response.status).toBe(400);
@@ -241,8 +304,11 @@ describe("/v1/publish", () => {
       zlsVersion: "0.1.0",
       zigVersion: "0.1.1",
       artifacts: [
-        ["zls-x86_64-linux-0.1.0.tar.xz", new Blob(["binary1"])],
-        ["zls-aarch64-windows-0.1.0.zip", new Blob(["binary2"])],
+        ["zls-x86_64-linux-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
+        [
+          "zls-aarch64-windows-0.1.0.zip",
+          new Blob([zipMagicNumber, "binary2"]),
+        ],
       ],
     });
 
@@ -264,16 +330,22 @@ describe("/v1/publish", () => {
           os: "linux",
           version: "0.1.0",
           extension: "tar.xz",
-          file_shasum: createHash("sha256").update("binary1").digest("hex"),
-          file_size: 7,
+          file_shasum: createHash("sha256")
+            .update(xzMagicNumber)
+            .update("binary1")
+            .digest("hex"),
+          file_size: xzMagicNumber.length + 7,
         },
         {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0",
           extension: "zip",
-          file_shasum: createHash("sha256").update("binary2").digest("hex"),
-          file_size: 7,
+          file_shasum: createHash("sha256")
+            .update(zipMagicNumber)
+            .update("binary2")
+            .digest("hex"),
+          file_size: zipMagicNumber.length + 7,
         },
       ],
     });
@@ -283,11 +355,11 @@ describe("/v1/publish", () => {
     expect(objects.objects).toMatchObject([
       {
         key: "zls-linux-x86_64-0.1.0.tar.xz",
-        size: 7,
+        size: xzMagicNumber.length + 7,
       },
       {
         key: "zls-windows-aarch64-0.1.0.zip",
-        size: 7,
+        size: zipMagicNumber.length + 7,
       },
     ]);
   });
@@ -297,7 +369,12 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.11.0",
         zigVersion: "0.11.0",
-        artifacts: [["zls-x86_64-linux-0.11.0.tar.xz", new Blob(["binary1"])]],
+        artifacts: [
+          [
+            "zls-x86_64-linux-0.11.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
       });
       expect(response.status).toBe(200);
     }
@@ -307,7 +384,12 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.11.0",
         zigVersion: "0.11.1",
-        artifacts: [["zls-x86_64-linux-0.11.0.tar.xz", new Blob(["binary1"])]],
+        artifacts: [
+          [
+            "zls-x86_64-linux-0.11.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
       });
       expect(response.status).toBe(200);
     }
@@ -317,7 +399,12 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.11.0",
         zigVersion: "0.11.0",
-        artifacts: [["zls-x86_64-linux-0.11.0.tar.xz", new Blob(["binary1"])]],
+        artifacts: [
+          [
+            "zls-x86_64-linux-0.11.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
       });
       expect(response.status).toBe(200);
     }
@@ -327,7 +414,12 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.11.0",
         zigVersion: "0.11.0",
-        artifacts: [["zls-x86_64-linux-0.11.0.tar.xz", new Blob(["binary2"])]],
+        artifacts: [
+          [
+            "zls-x86_64-linux-0.11.0.tar.xz",
+            new Blob([xzMagicNumber, "binary2"]),
+          ],
+        ],
       });
       expect(response.status).toBe(400);
     }
@@ -343,8 +435,14 @@ describe("/v1/publish", () => {
         zlsVersion: "0.1.0",
         zigVersion: "0.1.1",
         artifacts: [
-          ["zls-x86_64-linux-0.1.0.tar.xz", new Blob(["binary1"])],
-          ["zls-aarch64-windows-0.1.0.zip", new Blob(["binary2"])],
+          [
+            "zls-x86_64-linux-0.1.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+          [
+            "zls-aarch64-windows-0.1.0.zip",
+            new Blob([zipMagicNumber, "binary2"]),
+          ],
         ],
       });
       expect(response.status).toBe(200);
@@ -356,8 +454,14 @@ describe("/v1/publish", () => {
         zlsVersion: "0.1.0",
         zigVersion: "0.1.2",
         artifacts: [
-          ["zls-x86_64-linux-0.1.0.tar.xz", new Blob(["binary3"])],
-          ["zls-aarch64-windows-0.1.0.zip", new Blob(["binary4"])],
+          [
+            "zls-x86_64-linux-0.1.0.tar.xz",
+            new Blob([xzMagicNumber, "binary3"]),
+          ],
+          [
+            "zls-aarch64-windows-0.1.0.zip",
+            new Blob([zipMagicNumber, "binary4"]),
+          ],
         ],
       });
       expect(response.status).toBe(200);
@@ -391,16 +495,22 @@ describe("/v1/publish", () => {
           os: "linux",
           version: "0.1.0",
           extension: "tar.xz",
-          file_shasum: createHash("sha256").update("binary1").digest("hex"),
-          file_size: 7,
+          file_shasum: createHash("sha256")
+            .update(xzMagicNumber)
+            .update("binary1")
+            .digest("hex"),
+          file_size: xzMagicNumber.byteLength + 7,
         },
         {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0",
           extension: "zip",
-          file_shasum: createHash("sha256").update("binary2").digest("hex"),
-          file_size: 7,
+          file_shasum: createHash("sha256")
+            .update(zipMagicNumber)
+            .update("binary2")
+            .digest("hex"),
+          file_size: zipMagicNumber.byteLength + 7,
         },
       ],
     });
