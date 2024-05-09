@@ -76,6 +76,12 @@ export async function handleSelectZLSVersion(
     });
   }
 
+  if (typeof env.R2_PUBLIC_URL !== "string" || !env.R2_PUBLIC_URL) {
+    return new Response(null, {
+      status: 500, // Internal Server Error
+    });
+  }
+
   const url = new URL(request.url);
   const zigVersionString = url.searchParams.get("zig_version");
 
