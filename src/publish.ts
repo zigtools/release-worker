@@ -363,6 +363,9 @@ export async function handlePublish(
     artifacts.map((artifact, index) => {
       const key = `zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`;
       return env.ZIGTOOLS_BUILDS.put(key, artifact_blobs[index], {
+        httpMetadata: {
+          cacheControl: "max-age=31536000",
+        },
         sha256: artifact.file_shasum,
       });
     }),

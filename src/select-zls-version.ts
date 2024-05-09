@@ -101,7 +101,11 @@ export async function handleSelectZLSVersion(
       };
     }
 
-    return Response.json(response);
+    return Response.json(response, {
+      headers: {
+        "cache-control": "max-age=43200", // 12 hours
+      },
+    });
   }
 
   const zigVersion = SemanticVersion.parse(zigVersionString);
@@ -133,8 +137,9 @@ export async function handleSelectZLSVersion(
 
   return Response.json(response, {
     headers: {
-      "cache-control": "no-cache",
-      // "cache-control": "max-age=1500", // 25 minutes
+      "cache-control": zigVersion.isRelease
+        ? "max-age=43200" // 12 hours
+        : "max-age=600", // 10 minutes
     },
   });
 }
