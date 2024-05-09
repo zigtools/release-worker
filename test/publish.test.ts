@@ -1,4 +1,5 @@
 import { env, SELF } from "cloudflare:test";
+import assert from "node:assert";
 import { createHash } from "node:crypto";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -364,6 +365,26 @@ describe("/v1/publish", () => {
         size: zipMagicNumber.length + 7,
       },
     ]);
+
+    assert(objects.objects[0].checksums.sha256 !== undefined);
+    assert(objects.objects[1].checksums.sha256 !== undefined);
+
+    expect(
+      Buffer.from(objects.objects[0].checksums.sha256).toString("hex"),
+    ).toBe(
+      createHash("sha256")
+        .update(xzMagicNumber)
+        .update("binary1")
+        .digest("hex"),
+    );
+    expect(
+      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
+    ).toBe(
+      createHash("sha256")
+        .update(zipMagicNumber)
+        .update("binary2")
+        .digest("hex"),
+    );
   });
 
   test.todo("publish builds with mismatching commit hashes", async () => {

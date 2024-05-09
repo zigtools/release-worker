@@ -350,7 +350,9 @@ export async function handlePublish(
   await Promise.all(
     artifacts.map((artifact, index) => {
       const key = `zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`;
-      return env.ZIGTOOLS_BUILDS.put(key, artifact_blobs[index]);
+      return env.ZIGTOOLS_BUILDS.put(key, artifact_blobs[index], {
+        sha256: artifact.file_shasum,
+      });
     }),
   );
 
