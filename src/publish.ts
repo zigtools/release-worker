@@ -337,14 +337,14 @@ export async function handlePublish(
 
   await env.ZIGTOOLS_DB.batch([
     env.ZIGTOOLS_DB.prepare(
-      "INSERT OR IGNORE INTO ZLSReleases (ZLSVersion, ZLSVersionMajor, ZLSVersionMinor, ZLSVersionPatch, IsRelease, ZLSVersionBuildID, JsonData) VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
+      "INSERT OR IGNORE INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
     ).bind(
       zlsVersionString,
       zlsVersion.major,
       zlsVersion.minor,
       zlsVersion.patch,
-      zlsVersion.isRelease,
       zlsVersion.commitHeight ?? null,
+      zlsVersion.isRelease,
       JSON.stringify(newEntryValue),
     ),
     env.ZIGTOOLS_DB.prepare(

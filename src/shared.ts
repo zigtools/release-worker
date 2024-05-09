@@ -56,15 +56,15 @@ export async function insertZLSRelease(
   assert(zlsVersion !== null);
 
   await env.ZIGTOOLS_DB.prepare(
-    "INSERT INTO ZLSReleases (ZLSVersion, ZLSVersionMajor, ZLSVersionMinor, ZLSVersionPatch, IsRelease, ZLSVersionBuildID, JsonData) VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
+    "INSERT INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
   )
     .bind(
       jsonData.zlsVersion,
       zlsVersion.major,
       zlsVersion.minor,
       zlsVersion.patch,
-      zlsVersion.isRelease,
       zlsVersion.commitHeight ?? null,
+      zlsVersion.isRelease,
       JSON.stringify(jsonData),
     )
     .run();
