@@ -176,9 +176,16 @@ describe("/v1/select-zls-version", () => {
         new Request("https://example.com/v1/select-zls-version"),
         env,
       );
-      expect(
-        await response.json(),
-      ).toStrictEqual<SelectZLSVersionWithoutVersionResponse>({
+      const body =
+        await response.json<SelectZLSVersionWithoutVersionResponse>();
+
+      expect(Object.keys(body)).toStrictEqual([
+        "0.13.0",
+        "0.12.1",
+        "0.12.0",
+        "0.11.0",
+      ]);
+      expect(body).toStrictEqual({
         "0.11.0": {
           date: "1970-01-01",
           "x86_64-linux": {

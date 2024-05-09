@@ -87,7 +87,7 @@ export async function handleSelectZLSVersion(
 
   if (zigVersionString === null) {
     const result = await env.ZIGTOOLS_DB.prepare(
-      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1",
+      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
     ).all<{ JsonData: string }>();
 
     const response: SelectZLSVersionWithoutVersionResponse = {};
