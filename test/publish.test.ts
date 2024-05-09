@@ -11,6 +11,7 @@ import {
 import { handlePublish } from "../src/publish";
 
 async function sendPublishForm(form: FormData): Promise<Response> {
+  assert(typeof env.API_TOKEN === "string" && env.API_TOKEN);
   return await handlePublish(
     new Request("https://example.com/v1/publish", {
       body: form,

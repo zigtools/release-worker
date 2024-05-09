@@ -132,6 +132,12 @@ export async function handlePublish(
     });
   }
 
+  if (typeof env.API_TOKEN !== "string" || !env.API_TOKEN) {
+    return new Response(null, {
+      status: 500, // Internal Server Error
+    });
+  }
+
   const authResponse = checkRequestAuthentication(
     request,
     "admin",
