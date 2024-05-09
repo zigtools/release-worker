@@ -31,9 +31,6 @@ curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=1.0.0"
 
 ## /v1/select-zls-version (TODO)
 
-> [!WARNING]
-> This has not been implemented yet
-
 The response body imitates Zig's [index.json](https://ziglang.org/download/index.json) except that there is no field for `master`. Development builds of ZLS should be queried by supplying the Zig version that is being used.
 
 ### Example

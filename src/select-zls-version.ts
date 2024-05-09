@@ -1,16 +1,27 @@
 import assert from "node:assert";
 import { Env } from "./env";
 import { SemanticVersion } from "./semantic-version";
-import { D2JsonData } from "./shared";
+import { D2JsonData, ReleaseArtifact } from "./shared";
 
 /**
  * Similar to https://ziglang.org/download/index.json
  */
-export interface SelectZLSVersionResponse {
+export interface SelectZLSVersionWithVersionResponse {
   version: string;
   date: string;
-  [artifact: string]: ArtifactEntry | undefined | string;
+  [artifact: string]: ArtifactEntry | string | undefined;
 }
+
+/**
+ * Similar to https://ziglang.org/download/index.json
+ */
+export type SelectZLSVersionWithoutVersionResponse = Record<
+  string,
+  {
+    date: string;
+    [artifact: string]: ArtifactEntry | string | undefined;
+  }
+>;
 
 export interface ArtifactEntry {
   tarball: string;
@@ -37,6 +48,21 @@ export interface ArtifactEntry {
 //   UntestedDevelopmentBuild,
 // }
 
+function artifactsToRecord(
+  env: Env,
+  artifacts: ReleaseArtifact[],
+): Record<string, ArtifactEntry> {
+  const targets: Record<string, ArtifactEntry> = {};
+  for (const artifact of artifacts) {
+    targets[`${artifact.arch}-${artifact.os}`] = {
+      tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
+      shasum: artifact.file_shasum,
+      size: artifact.file_size.toString(),
+    };
+  }
+  return targets;
+}
+
 /**
  * `${ENDPOINT}/select-zls-version?zig_version=0.12.0`
  */
@@ -54,9 +80,22 @@ export async function handleSelectZLSVersion(
   const zigVersionString = url.searchParams.get("zig_version");
 
   if (zigVersionString === null) {
-    return new Response("Expected query component with key 'zig_version'!", {
-      status: 400, // Bad Request
-    });
+    const result = await env.ZIGTOOLS_DB.prepare(
+      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1",
+    ).all<{ JsonData: string }>();
+
+    const response: SelectZLSVersionWithoutVersionResponse = {};
+
+    for (const entry of result.results) {
+      const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
+      assert(jsonData.date !== null); // a tagged release is never failed
+      response[jsonData.zlsVersion] = {
+        date: new Date(jsonData.date).toISOString().slice(0, 10),
+        ...artifactsToRecord(env, jsonData.artifacts),
+      };
+    }
+
+    return Response.json(response);
   }
 
   const zigVersion = SemanticVersion.parse(zigVersionString);
@@ -77,21 +116,12 @@ export async function handleSelectZLSVersion(
     selectedVersion = await selectOnDevelopmentBuild(env, zigVersion);
   }
 
-  let response: SelectZLSVersionResponse | null = null;
+  let response: SelectZLSVersionWithVersionResponse | null = null;
   if (selectedVersion?.date != null && selectedVersion.artifacts.length !== 0) {
-    const targets: Record<string, ArtifactEntry> = {};
-    for (const artifact of selectedVersion.artifacts) {
-      targets[`${artifact.arch}-${artifact.os}`] = {
-        tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
-        shasum: artifact.file_shasum,
-        size: artifact.file_size.toString(),
-      };
-    }
-
     response = {
       version: selectedVersion.zlsVersion,
       date: new Date(selectedVersion.date).toISOString().slice(0, 10),
-      ...targets,
+      ...artifactsToRecord(env, selectedVersion.artifacts),
     };
   }
 

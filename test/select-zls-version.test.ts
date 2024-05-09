@@ -3,7 +3,8 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { D2JsonData, insertZLSRelease, ReleaseArtifact } from "../src/shared";
 import {
   handleSelectZLSVersion,
-  SelectZLSVersionResponse,
+  SelectZLSVersionWithoutVersionResponse,
+  SelectZLSVersionWithVersionResponse,
 } from "../src/select-zls-version";
 
 const default_artifacts: ReleaseArtifact[] = [
@@ -110,7 +111,7 @@ const samples: D2JsonData[] = [
 
 async function selectZLSVersion(
   zigVersion: string,
-): Promise<SelectZLSVersionResponse | null> {
+): Promise<SelectZLSVersionWithVersionResponse | null> {
   const url = new URL("https://example.com/v1/select-zls-version");
   url.searchParams.set("zig_version", zigVersion);
 
@@ -138,16 +139,6 @@ describe("/v1/select-zls-version", () => {
     expect(response.status).toBe(405);
   });
 
-  test("expect zig version", async () => {
-    const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version",
-    );
-    expect(await response.text()).toBe(
-      "Expected query component with key 'zig_version'!",
-    );
-    expect(response.status).toBe(400);
-  });
-
   test("invalid zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version?zig_version=foo",
@@ -159,6 +150,14 @@ describe("/v1/select-zls-version", () => {
   });
 
   test("search on empty database", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/select-zls-version",
+    );
+    expect(await response.json()).toStrictEqual({});
+    expect(response.status).toBe(200);
+  });
+
+  test("search on empty database with Zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version?zig_version=0.11.0",
     );
@@ -172,9 +171,73 @@ describe("/v1/select-zls-version", () => {
       for (const sample of samples) await insertZLSRelease(env, sample);
     });
 
-    test("validate response body", async () => {
+    test("search without version", async () => {
+      const response = await handleSelectZLSVersion(
+        new Request("https://example.com/v1/select-zls-version"),
+        env,
+      );
+      expect(
+        await response.json(),
+      ).toStrictEqual<SelectZLSVersionWithoutVersionResponse>({
+        "0.11.0": {
+          date: "1970-01-01",
+          "x86_64-linux": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
+            shasum: "aaa",
+            size: "12",
+          },
+          "aarch64-windows": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
+            shasum: "bbb",
+            size: "12",
+          },
+        },
+        "0.12.0": {
+          date: "1970-01-01",
+          "x86_64-linux": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
+            shasum: "aaa",
+            size: "12",
+          },
+          "aarch64-windows": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
+            shasum: "bbb",
+            size: "12",
+          },
+        },
+        "0.12.1": {
+          date: "1970-01-01",
+          "x86_64-linux": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
+            shasum: "aaa",
+            size: "12",
+          },
+          "aarch64-windows": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
+            shasum: "bbb",
+            size: "12",
+          },
+        },
+        "0.13.0": {
+          date: "1970-01-01",
+          "x86_64-linux": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
+            shasum: "aaa",
+            size: "12",
+          },
+          "aarch64-windows": {
+            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
+            shasum: "bbb",
+            size: "12",
+          },
+        },
+      });
+      expect(response.status).toBe(200);
+    });
+
+    test("search for with Version 0.11.0", async () => {
       const response = await selectZLSVersion("0.11.0");
-      expect(response).toStrictEqual<SelectZLSVersionResponse>({
+      expect(response).toStrictEqual<SelectZLSVersionWithVersionResponse>({
         date: "1970-01-01",
         version: "0.11.0",
         "x86_64-linux": {
