@@ -134,36 +134,36 @@ describe("/v1/select-zls-version", () => {
         method: "POST",
       },
     );
-    expect(response.status).toBe(405);
     expect(await response.text()).toBe("method must be 'GET'");
+    expect(response.status).toBe(405);
   });
 
   test("expect zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version",
     );
-    expect(response.status).toBe(400);
     expect(await response.text()).toBe(
       "Expected query component with key 'zig_version'!",
     );
+    expect(response.status).toBe(400);
   });
 
   test("invalid zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version?zig_version=foo",
     );
-    expect(response.status).toBe(400);
     expect(await response.text()).toBe(
       "Query component 'zig_version' with value 'foo' is not a valid semantic version!",
     );
+    expect(response.status).toBe(400);
   });
 
   test("search on empty database", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version?zig_version=0.11.0",
     );
-    expect(response.status).toBe(200);
     expect(await response.json()).toBe(null);
+    expect(response.status).toBe(200);
   });
 
   describe("test on sample database", () => {

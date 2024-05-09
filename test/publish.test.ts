@@ -52,8 +52,8 @@ async function sendPublish({
 describe("/v1/publish", () => {
   test("expect POST method", async () => {
     const response = await SELF.fetch("https://example.com/v1/publish");
-    expect(response.status).toBe(405);
     expect(await response.text()).toBe("method must be 'POST'");
+    expect(response.status).toBe(405);
   });
 
   describe("check authorization", () => {
@@ -62,8 +62,8 @@ describe("/v1/publish", () => {
         method: "POST",
       });
 
-      expect(response.status).toBe(401);
       expect(await response.text()).toBe("Authorization failed");
+      expect(response.status).toBe(401);
     });
 
     test("invalid Authorization header", async () => {
@@ -74,10 +74,10 @@ describe("/v1/publish", () => {
           Authorization: "invalid",
         },
       });
-      expect(response.status).toBe(400);
       expect(await response.text()).toContain(
         "Unexpected Authorization header",
       );
+      expect(response.status).toBe(400);
     });
 
     test("non Basic Authorization header", async () => {
@@ -88,10 +88,10 @@ describe("/v1/publish", () => {
           Authorization: "Bearer foo",
         },
       });
-      expect(response.status).toBe(400);
       expect(await response.text()).toBe(
         "Expected 'Basic' authentication scheme!",
       );
+      expect(response.status).toBe(400);
     });
 
     test("wrong username", async () => {
@@ -102,8 +102,8 @@ describe("/v1/publish", () => {
           Authorization: `Basic ${Buffer.from(`wrong:${env.API_TOKEN}`).toString("base64")}`,
         },
       });
-      expect(response.status).toBe(401);
       expect(await response.text()).toBe("Authorization failed");
+      expect(response.status).toBe(401);
     });
 
     test("wrong password", async () => {
@@ -114,8 +114,8 @@ describe("/v1/publish", () => {
           Authorization: `Basic ${Buffer.from("admin:wrong").toString("base64")}`,
         },
       });
-      expect(response.status).toBe(401);
       expect(await response.text()).toBe("Authorization failed");
+      expect(response.status).toBe(401);
     });
   });
 
@@ -125,8 +125,8 @@ describe("/v1/publish", () => {
       // form.set("zls-version", "0.1.0");
       form.set("zig-version", "0.1.0");
       const response = await sendPublishForm(form);
-      expect(response.status).toBe(400);
       expect(await response.text()).toBe("Missing form item 'zls-version'!");
+      expect(response.status).toBe(400);
     });
 
     test("missing zig-version", async () => {
@@ -134,8 +134,8 @@ describe("/v1/publish", () => {
       form.set("zls-version", "0.1.0");
       // form.set("zig-version", "0.1.0");
       const response = await sendPublishForm(form);
-      expect(response.status).toBe(400);
       expect(await response.text()).toBe("Missing form item 'zig-version'!");
+      expect(response.status).toBe(400);
     });
 
     test.each<[string, "ok" | "bad"]>([
@@ -172,6 +172,7 @@ describe("/v1/publish", () => {
         artifacts: [],
       });
       if (expected === "ok") {
+        expect(await response.text()).toBe("");
         expect(response.status).toBe(200);
       } else {
         expect(await response.text()).toBe(
@@ -312,6 +313,7 @@ describe("/v1/publish", () => {
       ],
     });
 
+    expect(await response.text()).toBe("");
     expect(response.status).toBe(200);
 
     const jsonData = await searchZLSRelease(env, "0.1.0");
@@ -376,6 +378,7 @@ describe("/v1/publish", () => {
           ],
         ],
       });
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     }
 
@@ -391,6 +394,7 @@ describe("/v1/publish", () => {
           ],
         ],
       });
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     }
 
@@ -406,6 +410,7 @@ describe("/v1/publish", () => {
           ],
         ],
       });
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     }
 
@@ -421,6 +426,7 @@ describe("/v1/publish", () => {
           ],
         ],
       });
+      expect(await response.text()).toBe("TODO");
       expect(response.status).toBe(400);
     }
   });
@@ -445,6 +451,7 @@ describe("/v1/publish", () => {
           ],
         ],
       });
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     }
 
@@ -464,6 +471,7 @@ describe("/v1/publish", () => {
           ],
         ],
       });
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     }
 
@@ -474,6 +482,7 @@ describe("/v1/publish", () => {
         zigVersion: "0.1.3",
         artifacts: [],
       });
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     }
 
