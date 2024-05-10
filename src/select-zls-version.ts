@@ -29,25 +29,6 @@ export interface ArtifactEntry {
   size: string;
 }
 
-// export enum SelectZLSVersionFailureCode {
-//   /**
-//    * The Zig version is less than or equal to 0.9.0 which means that no tagged ZLS release exists.
-//    */
-//   UnsupportedTaggedRelease,
-//   /**
-//    * The Zig version would require a tagged ZLS release that doesn't exist, **yet**.
-//    */
-//   MissingTaggedRelease,
-//   /**
-//    * The Zig version is a development/nightly build that has no compatible ZLS build.
-//    */
-//   UnsupportedDevelopmentBuild,
-//   /**
-//    * The Zig version is a development/nightly build that has not been tested by ZLS's CI to be compatible.
-//    */
-//   UntestedDevelopmentBuild,
-// }
-
 function artifactsToRecord(
   env: Env,
   artifacts: ReleaseArtifact[],
@@ -64,7 +45,8 @@ function artifactsToRecord(
 }
 
 /**
- * `${ENDPOINT}/select-zls-version?zig_version=0.12.0`
+ * - `${ENDPOINT}/select-zls-version`
+ * - `${ENDPOINT}/select-zls-version?zig_version=0.12.0`
  */
 export async function handleSelectZLSVersion(
   request: Request,
