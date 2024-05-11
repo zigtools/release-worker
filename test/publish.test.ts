@@ -151,7 +151,7 @@ describe("/v1/publish", () => {
         zigVersion: "0.1.0",
         artifacts: [
           [
-            `zls-x86_64-linux-${zlsVersion}.tar.xz`,
+            `zls-linux-x86_64-${zlsVersion}.tar.xz`,
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -178,7 +178,7 @@ describe("/v1/publish", () => {
         zigVersion: zigVersion,
         artifacts: [
           [
-            `zls-x86_64-linux-0.1.0-dev.tar.xz`,
+            `zls-linux-x86_64-0.1.0-dev.tar.xz`,
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -206,7 +206,7 @@ describe("/v1/publish", () => {
       async (extension, body, expected) => {
         const fileName =
           extension == "xz"
-            ? "zls-x86_64-linux-0.1.0.tar.xz"
+            ? "zls-linux-x86_64-0.1.0.tar.xz"
             : "zls-x86_64-windows-0.1.0.zip";
         const response = await sendPublish({
           zlsVersion: "0.1.0",
@@ -230,10 +230,10 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [["zls-x86_64-linux-0.1.0.tar.xz", new Blob(["binary1"])]],
+        artifacts: [["zls-linux-x86_64-0.1.0.tar.xz", new Blob(["binary1"])]],
       });
       expect(await response.text()).toBe(
-        "artifact 'zls-x86_64-linux-0.1.0.tar.xz' should have the magic number fd 37 7a 58 5a 0 but got 62 69 6e 61 72 79!",
+        "artifact 'zls-linux-x86_64-0.1.0.tar.xz' should have the magic number fd 37 7a 58 5a 0 but got 62 69 6e 61 72 79!",
       );
       expect(response.status).toBe(400);
     });
@@ -242,11 +242,11 @@ describe("/v1/publish", () => {
       ["", "bad"],
       ["some string", "bad"],
       ["x86_64-linux-0.1.0.tar.xz", "bad"], // missing 'zls-' prefix
-      ["zls-x86_64-linux-0.1.0.gz", "bad"], // .gz extension not allowed
-      ["zls-x86_64-linux-0.1.0.tar.gz", "bad"], // .tar.gz extension not allowed
-      ["zls-x86_64-linux-0.2.0.tar.xz", "bad"], // mismatching ZLS version
-      ["zls-x86_64-linux-0.1.0.tar.xz", "ok"],
-      ["zls-aarch64-windows-0.1.0.zip", "ok"],
+      ["zls-linux-x86_64-0.1.0.gz", "bad"], // .gz extension not allowed
+      ["zls-linux-x86_64-0.1.0.tar.gz", "bad"], // .tar.gz extension not allowed
+      ["zls-linux-x86_64-0.2.0.tar.xz", "bad"], // mismatching ZLS version
+      ["zls-linux-x86_64-0.1.0.tar.xz", "ok"],
+      ["zls-windows-aarch64-0.1.0.zip", "ok"],
     ])("validate artifact string: %j -> %s", async (body, expected) => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
@@ -286,7 +286,7 @@ describe("/v1/publish", () => {
           zigVersion: zigVersion,
           artifacts: [
             [
-              `zls-x86_64-linux-${zlsVersion}.tar.xz`,
+              `zls-linux-x86_64-${zlsVersion}.tar.xz`,
               new Blob([xzMagicNumber, "binary1"]),
             ],
           ],
@@ -317,9 +317,9 @@ describe("/v1/publish", () => {
       zlsVersion: "0.1.0",
       zigVersion: "0.1.1",
       artifacts: [
-        ["zls-x86_64-linux-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
+        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
         [
-          "zls-aarch64-windows-0.1.0.zip",
+          "zls-windows-aarch64-0.1.0.zip",
           new Blob([zipMagicNumber, "binary2"]),
         ],
       ],
@@ -421,7 +421,7 @@ describe("/v1/publish", () => {
         zigVersion: "0.11.0",
         artifacts: [
           [
-            "zls-x86_64-linux-0.11.0.tar.xz",
+            "zls-linux-x86_64-0.11.0.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -437,7 +437,7 @@ describe("/v1/publish", () => {
         zigVersion: "0.11.1",
         artifacts: [
           [
-            "zls-x86_64-linux-0.11.0.tar.xz",
+            "zls-linux-x86_64-0.11.0.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -453,7 +453,7 @@ describe("/v1/publish", () => {
         zigVersion: "0.11.0",
         artifacts: [
           [
-            "zls-x86_64-linux-0.11.0.tar.xz",
+            "zls-linux-x86_64-0.11.0.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -469,7 +469,7 @@ describe("/v1/publish", () => {
         zigVersion: "0.11.0",
         artifacts: [
           [
-            "zls-x86_64-linux-0.11.0.tar.xz",
+            "zls-linux-x86_64-0.11.0.tar.xz",
             new Blob([xzMagicNumber, "binary2"]),
           ],
         ],
@@ -490,11 +490,11 @@ describe("/v1/publish", () => {
         zigVersion: "0.1.1",
         artifacts: [
           [
-            "zls-x86_64-linux-0.1.0-dev.tar.xz",
+            "zls-linux-x86_64-0.1.0-dev.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
           [
-            "zls-aarch64-windows-0.1.0-dev.zip",
+            "zls-windows-aarch64-0.1.0-dev.zip",
             new Blob([zipMagicNumber, "binary2"]),
           ],
         ],
@@ -510,11 +510,11 @@ describe("/v1/publish", () => {
         zigVersion: "0.1.2",
         artifacts: [
           [
-            "zls-x86_64-linux-0.1.0-dev.tar.xz",
+            "zls-linux-x86_64-0.1.0-dev.tar.xz",
             new Blob([xzMagicNumber, "binary3"]),
           ],
           [
-            "zls-aarch64-windows-0.1.0-dev.zip",
+            "zls-windows-aarch64-0.1.0-dev.zip",
             new Blob([zipMagicNumber, "binary4"]),
           ],
         ],

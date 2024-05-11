@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { Buffer } from "node:buffer";
 import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
@@ -236,10 +237,12 @@ export async function handlePublish(
       });
     }
 
-    const arch = match[1];
-    const os = match[2];
+    const os = match[1];
+    const arch = match[2];
     const version = match[3];
     const extension = match[4] as "tar.xz" | "zip";
+
+    assert(key === `zls-${os}-${arch}-${version}.${extension}`);
 
     let file_size: number;
     const file_hash = createHash("sha256");

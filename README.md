@@ -54,12 +54,12 @@ The body is a `multipart/form-data` with the following key value pairs:
 
 All other fields are interpreted as release artifacts. The key must have the following format:
 
-`zls-${ARCH}-${OS}-${ZLS_VERSION}.(tar.xz|zip)` (Example: `zls-x86_64-linux-0.1.0.tar.xz`)
+`zls-${OS}-${ARCH}-${ZLS_VERSION}.(tar.xz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
 
 > [!WARNING]
 > Minisign support has not been implemented yet.
 
-Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisign` file for every artifact. (Example: `zls-x86_64-linux-0.1.0.tar.xz.minisign`)
+Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisign` file for every artifact. (Example: `zls-linux-x86_64-0.1.0.tar.xz.minisign`)
 
 ## Development
 
