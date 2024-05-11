@@ -29,7 +29,7 @@ curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=1.0.0"
 >>> null
 ```
 
-## /v1/select-zls-version (TODO)
+## /v1/select-zls-version
 
 The response body imitates Zig's [index.json](https://ziglang.org/download/index.json) except that there is no field for `master`. Development builds of ZLS should be queried by supplying the Zig version that is being used.
 
@@ -55,9 +55,6 @@ The body is a `multipart/form-data` with the following key value pairs:
 All other fields are interpreted as release artifacts. The key must have the following format:
 
 `zls-${OS}-${ARCH}-${ZLS_VERSION}.(tar.xz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
-
-> [!WARNING]
-> Minisign support has not been implemented yet.
 
 Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisign` file for every artifact. (Example: `zls-linux-x86_64-0.1.0.tar.xz.minisign`)
 

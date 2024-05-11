@@ -30,12 +30,14 @@ async function sendPublish({
   minimumBuildZigVersion,
   minimumRuntimeZigVersion,
   artifacts,
+  withMinisign,
 }: {
   zlsVersion: string;
   zigVersion: string;
   minimumBuildZigVersion?: string;
   minimumRuntimeZigVersion?: string;
   artifacts: [fileName: string, file: Blob][];
+  withMinisign?: boolean;
 }): Promise<Response> {
   const form = new FormData();
   form.set("zls-version", zlsVersion);
@@ -47,6 +49,16 @@ async function sendPublish({
   );
   for (const [fileName, file] of artifacts) {
     form.set(fileName, file, fileName);
+    if (withMinisign ?? false) {
+      const minisignFileName = `${fileName}.minisign`;
+      form.set(
+        minisignFileName,
+        new Blob([
+          "something... signature, something... hash, something... crypto",
+        ]),
+        minisignFileName,
+      );
+    }
   }
   return await sendPublishForm(form);
 }
@@ -398,10 +410,61 @@ describe("/v1/publish", () => {
     );
   });
 
-  test("disallow publishing a failed tagged release", async () => {
+  test("publish new successfull build with minisign", async () => {
     const date = Date.now();
     vi.setSystemTime(date);
 
+    const response = await sendPublish({
+      zlsVersion: "0.1.0",
+      zigVersion: "0.1.1",
+      artifacts: [
+        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
+      ],
+      withMinisign: true,
+    });
+
+    expect(await response.text()).toBe("");
+    expect(response.status).toBe(200);
+
+    const jsonData = await searchZLSRelease(env, "0.1.0");
+    expect(jsonData).toStrictEqual<D2JsonData>({
+      date: date,
+      zlsVersion: "0.1.0",
+      zigVersion: "0.1.1",
+      minimumBuildZigVersion: "0.1.1",
+      minimumRuntimeZigVersion: "0.1.1",
+      testedZigVersion: {
+        "0.1.1": true,
+      },
+      artifacts: [
+        {
+          arch: "x86_64",
+          os: "linux",
+          version: "0.1.0",
+          extension: "tar.xz",
+          file_shasum: createHash("sha256")
+            .update(xzMagicNumber)
+            .update("binary1")
+            .digest("hex"),
+          file_size: xzMagicNumber.length + 7,
+        },
+      ],
+    });
+
+    const objects = await env.ZIGTOOLS_BUILDS.list({});
+
+    expect(objects.objects).toMatchObject([
+      {
+        key: "zls-linux-x86_64-0.1.0.tar.xz",
+        size: xzMagicNumber.length + 7,
+      },
+      {
+        key: "zls-linux-x86_64-0.1.0.tar.xz.minisign",
+      },
+    ]);
+  });
+
+  test("disallow publishing a failed tagged release", async () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0",
       zigVersion: "0.1.0",
@@ -410,6 +473,44 @@ describe("/v1/publish", () => {
 
     expect(await response.text()).toBe(
       "A new tagged release of ZLS must have artifacts!",
+    );
+    expect(response.status).toBe(400);
+  });
+
+  test("disallow publishing partial minisigns", async () => {
+    const response = await sendPublish({
+      zlsVersion: "0.1.0",
+      zigVersion: "0.1.0",
+      artifacts: [
+        [
+          "zls-linux-x86_64-0.11.0.tar.xz",
+          new Blob([xzMagicNumber, "binary1"]),
+        ],
+        ["zls-linux-x86_64-0.11.0.tar.xz.minisign", new Blob(["something"])],
+        [
+          "zls-windows-aarch64-0.1.0-dev.zip",
+          new Blob([zipMagicNumber, "binary2"]),
+        ],
+      ],
+    });
+
+    expect(await response.text()).toBe(
+      "Either, every artifact has a minisign file, or none!",
+    );
+    expect(response.status).toBe(400);
+  });
+
+  test("publish unknown minisign", async () => {
+    const response = await sendPublish({
+      zlsVersion: "0.1.0",
+      zigVersion: "0.1.0",
+      artifacts: [
+        ["zls-linux-x86_64-0.11.0.tar.xz.minisign", new Blob(["something"])],
+      ],
+    });
+
+    expect(await response.text()).toBe(
+      "minisign file 'zls-linux-x86_64-0.11.0.tar.xz.minisign' has not matching artifact!",
     );
     expect(response.status).toBe(400);
   });

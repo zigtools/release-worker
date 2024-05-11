@@ -162,6 +162,11 @@ export async function handlePublish(
     }
   }
 
+  /** the return type of the `entries` function is not correct because it doesn't include `File` */
+  const formEntries = form.entries() as IterableIterator<
+    [key: string, value: string | File]
+  >;
+
   const [zlsVersionString, zlsVersion, zlsVersionResponse] =
     expectSemverFormItem(form, "zls-version");
   if (zlsVersionResponse !== null) return zlsVersionResponse;
@@ -210,23 +215,40 @@ export async function handlePublish(
 
   const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|zip)$/;
   const artifacts: ReleaseArtifact[] = [];
-  const artifact_blobs: Blob[] = [];
+  const artifact_files: File[] = [];
+  const artifact_minisigns: Record<string, File | undefined> = {};
 
-  for (const [key, value] of form.entries() as IterableIterator<
-    [key: string, value: string | File]
-  >) {
+  for (const [key, file] of formEntries) {
     if (key === "zig-version") continue;
     if (key === "zls-version") continue;
     if (key === "minimum-build-zig-version") continue;
     if (key === "minimum-runtime-zig-version") continue;
 
-    if (key.endsWith(".minisign")) {
+    if (typeof file === "string") {
+      return new Response(`artifact '${key}' must be encoded as a file!`, {
+        status: 400, // Bad Request
+      });
+    }
+
+    if (key !== file.name) {
       return new Response(
-        `publishing .minisign files is currently unsupported!`,
+        `artifact key '${key}' must match the file name but got '${file.name}'!`,
         {
           status: 400, // Bad Request
         },
       );
+    }
+
+    if (file.size === 0) {
+      return new Response(`artifact '${key}' can't be empty!`, {
+        status: 400, // Bad Request
+      });
+    }
+
+    if (key.endsWith(".minisign")) {
+      assert(!artifact_minisigns[key]); // keys are unique
+      artifact_minisigns[key] = file;
+      continue;
     }
 
     const match = key.match(artifactRegex);
@@ -244,20 +266,8 @@ export async function handlePublish(
 
     assert(key === `zls-${os}-${arch}-${version}.${extension}`);
 
-    let file_size: number;
-    const file_hash = createHash("sha256");
-
-    if (typeof value === "string") {
-      return new Response(`artifact '${key}' must be encoded as a file!`, {
-        status: 400, // Bad Request
-      });
-    } else {
-      file_size = value.size;
-      await pipeline(value.stream(), file_hash);
-    }
-
     // console.log(
-    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${file_hash.digest("hex")}, size=${file_size.toString()}`,
+    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${file_hash.digest("hex")}, size=${value.size.toString()}`,
     // );
 
     if (!SemanticVersion.parse(version)) {
@@ -268,6 +278,9 @@ export async function handlePublish(
         },
       );
     }
+
+    const file_hash = createHash("sha256");
+    await pipeline(file.stream(), file_hash);
 
     let expectedMagicNumber: Buffer;
     switch (extension) {
@@ -280,7 +293,7 @@ export async function handlePublish(
     }
 
     const actualMagicNumber: Uint8Array = new Uint8Array(
-      await value.slice(0, expectedMagicNumber.byteLength).arrayBuffer(),
+      await file.slice(0, expectedMagicNumber.byteLength).arrayBuffer(),
     );
 
     if (!expectedMagicNumber.equals(actualMagicNumber)) {
@@ -292,7 +305,7 @@ export async function handlePublish(
       );
     }
 
-    artifact_blobs.push(value);
+    artifact_files.push(file);
 
     artifacts.push({
       os: os,
@@ -300,8 +313,39 @@ export async function handlePublish(
       version: version,
       extension: extension,
       file_shasum: file_hash.digest("hex"),
-      file_size: file_size,
+      file_size: file.size,
     });
+  }
+  assert(artifacts.length == artifact_files.length);
+
+  const artifact_has_minisign = Array<boolean>(artifacts.length).fill(false);
+
+  for (const minisignFileName of Object.keys(artifact_minisigns)) {
+    const artifactIndex = artifact_files.findIndex(
+      (file) => `${file.name}.minisign` == minisignFileName,
+    );
+    if (artifactIndex === -1) {
+      return new Response(
+        `minisign file '${minisignFileName}' has not matching artifact!`,
+        {
+          status: 400, // Bad Request
+        },
+      );
+    }
+    assert(!artifact_has_minisign[artifactIndex]); // keys are unique
+    artifact_has_minisign[artifactIndex] = true;
+  }
+
+  if (
+    artifact_has_minisign.length !== 0 &&
+    !artifact_has_minisign.every((value) => value === artifact_has_minisign[0])
+  ) {
+    return new Response(
+      `Either, every artifact has a minisign file, or none!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
   }
 
   if (zlsVersion.isRelease && artifacts.length === 0) {
@@ -362,17 +406,34 @@ export async function handlePublish(
     ),
   ]);
 
-  await Promise.all(
-    artifacts.map((artifact, index) => {
-      const key = `zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`;
-      return env.ZIGTOOLS_BUILDS.put(key, artifact_blobs[index], {
+  const promises: Promise<R2Object>[] = [];
+
+  for (let i = 0; i < artifacts.length; i++) {
+    const artifact = artifacts[i];
+    const file = artifact_files[i];
+    const minisignFile = artifact_minisigns[`${file.name}.minisign`];
+
+    promises.push(
+      env.ZIGTOOLS_BUILDS.put(file.name, file, {
         httpMetadata: {
           cacheControl: "max-age=31536000",
         },
         sha256: artifact.file_shasum,
-      });
-    }),
-  );
+      }),
+    );
+
+    if (minisignFile !== undefined) {
+      promises.push(
+        env.ZIGTOOLS_BUILDS.put(minisignFile.name, minisignFile, {
+          httpMetadata: {
+            cacheControl: "max-age=31536000",
+          },
+        }),
+      );
+    }
+  }
+
+  await Promise.all(promises);
 
   return new Response(null, {
     status: 200, // Ok
