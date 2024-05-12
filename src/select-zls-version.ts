@@ -192,8 +192,8 @@ async function selectOnDevelopmentBuild(
     assert(entryZigVersion);
 
     switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
-      // the minimum build version may not be monotonically increasing (i.e a newer release has lower minimum build version) so keep searching
       case -1:
+        // the minimum build version may not be monotonically increasing (i.e a newer release has lower minimum build version) so keep searching
         return;
       case 0:
       case 1:

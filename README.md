@@ -47,8 +47,8 @@ curl "https://releases.zigtools.org/v1/select-zls-version"
 
 The body is a `multipart/form-data` with the following key value pairs:
 
-- `zls-version`: The ZLS version which must be semantic version
-- `zig-version`: The Zig version which must be semantic version
+- `zls-version`: The ZLS version which must be a semantic version
+- `zig-version`: The Zig version which must be a semantic version
 - `minimum-build-zig-version`: The minimum Zig version that is required to compile and test ZLS:
 - `minimum-runtime-zig-version`: The minimum Zig version that is required to run ZLS:
 

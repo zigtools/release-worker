@@ -2,7 +2,9 @@ export class SemanticVersion {
   major!: number;
   minor!: number;
   patch!: number;
+  /** `isRelease` implies `!commitHeight && !commitID` */
   isRelease!: boolean;
+  /** may be `undefined` even if `isRelease` */
   commitHeight?: number;
   commitID?: string;
 
