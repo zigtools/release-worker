@@ -34,6 +34,13 @@ export interface ReleaseArtifact {
   file_size: number;
 }
 
+export interface SQLiteQueryPlanRow {
+  id: number;
+  parent: number;
+  notused: number;
+  detail: string;
+}
+
 export async function searchZLSRelease(
   env: Env,
   zlsVersion: string,

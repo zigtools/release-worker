@@ -68,6 +68,7 @@ export async function handleSelectZLSVersion(
   const zigVersionString = url.searchParams.get("zig_version");
 
   if (zigVersionString === null) {
+    // update the "explain query plan when searching all tagged releases" test when modifying the query
     const result = await env.ZIGTOOLS_DB.prepare(
       "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
     ).all<{ JsonData: string }>();
@@ -132,6 +133,7 @@ async function selectOnTaggedRelease(
 ): Promise<D2JsonData | null> {
   assert(zigVersion.isRelease);
 
+  // update the "explain query plan when searching on tagged release" test when modifying the query
   const selectedRelease = await env.ZIGTOOLS_DB.prepare(
     "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionPatch DESC",
   )
@@ -152,6 +154,7 @@ async function selectOnDevelopmentBuild(
 ): Promise<D2JsonData | null> {
   assert(!zigVersion.isRelease);
 
+  // update the "explain query plan when searching on development built" test when modifying the query
   const releases = await env.ZIGTOOLS_DB.prepare(
     "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
   )

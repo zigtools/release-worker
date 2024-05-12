@@ -1,6 +1,11 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, test, expect, beforeEach } from "vitest";
-import { D2JsonData, insertZLSRelease, ReleaseArtifact } from "../src/shared";
+import {
+  D2JsonData,
+  insertZLSRelease,
+  ReleaseArtifact,
+  SQLiteQueryPlanRow,
+} from "../src/shared";
 import {
   handleSelectZLSVersion,
   SelectZLSVersionWithoutVersionResponse,
@@ -282,5 +287,57 @@ describe("/v1/select-zls-version", () => {
       const response = await selectZLSVersion(zigVersion);
       expect(response?.version ?? null).toBe(expectedZLSVersion);
     });
+  });
+
+  test("explain query plan when searching all tagged releases", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+    ).all<SQLiteQueryPlanRow>();
+
+    // TODO test `response.meta.rows_read` on an example database
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=?)",
+      },
+    ]);
+  });
+
+  test("explain query plan when searching on tagged release", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionPatch DESC",
+    )
+      .bind(0, 12)
+      .all<SQLiteQueryPlanRow>();
+
+    // TODO test `response.meta.rows_read` on an example database
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=? AND ZLSVersionMajor=? AND ZLSVersionMinor=?)",
+      },
+    ]);
+  });
+
+  test("explain query plan when searching on development built", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
+    )
+      .bind(0, 12)
+      .all<SQLiteQueryPlanRow>();
+
+    // TODO test `response.meta.rows_read` on an example database
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_major_minor_id_where_not_release (ZLSVersionMajor=? AND ZLSVersionMinor=?)",
+      },
+    ]);
   });
 });
