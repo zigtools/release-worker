@@ -59,4 +59,15 @@ export class SemanticVersion {
 
     return 0;
   }
+
+  public toString(): string {
+    const a = `${this.major.toString()}.${this.minor.toString()}.${this.patch.toString()}`;
+    if (this.isRelease) return a;
+    if (!this.commitHeight || !this.commitID) return `${a}-dev`;
+    return `${a}-dev.${this.commitHeight.toString()}+${this.commitID}`;
+  }
+
+  get [Symbol.toStringTag]() {
+    return this.toString();
+  }
 }

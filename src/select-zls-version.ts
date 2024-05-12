@@ -144,9 +144,66 @@ async function selectOnTaggedRelease(
   return JSON.parse(selectedRelease.JsonData) as D2JsonData;
 }
 
+function isVersionEnclosedInFailure(
+  /** must be sorted in ascending order */
+  testedVersions: { version: SemanticVersion; isSuccess: boolean }[],
+  version: SemanticVersion,
+): boolean {
+  assert(testedVersions.length !== 0);
+
+  // fast path: if the `version` is oldest or equal to the oldest tested version
+  const oldestTestedVersion = testedVersions[0];
+  switch (SemanticVersion.order(version, oldestTestedVersion.version)) {
+    case -1:
+    case 0:
+      return !oldestTestedVersion.isSuccess;
+    case 1:
+      break;
+  }
+
+  // fast path: if the `version` is newer or equal to the latest tested version
+  const newestTestedVersion = testedVersions[testedVersions.length - 1];
+  switch (SemanticVersion.order(version, newestTestedVersion.version)) {
+    case -1:
+      break;
+    case 0:
+    case 1:
+      return !newestTestedVersion.isSuccess;
+  }
+
+  let start = 0;
+  let end = testedVersions.length - 1;
+
+  while (start <= end) {
+    const mid: number = Math.floor((start + end) / 2);
+
+    switch (SemanticVersion.order(testedVersions[mid].version, version)) {
+      case -1:
+        start = mid + 1;
+        break;
+      case 0:
+        return !testedVersions[mid].isSuccess;
+      case 1:
+        end = mid - 1;
+        break;
+    }
+  }
+
+  [start, end] = [end, start];
+
+  if (start < 0 || testedVersions.length <= start)
+    return !testedVersions[end].isSuccess;
+  if (end < 0 || testedVersions.length <= end)
+    return !testedVersions[start].isSuccess;
+
+  const startIsSuccess = testedVersions[start].isSuccess;
+  const endIsSuccess = testedVersions[end].isSuccess;
+
+  return !startIsSuccess && !endIsSuccess;
+}
+
 /**
- * This code is ported over from `https://gist.github.com/Techatrix/02ce258460d4ca1c8424e600458575b0`.
- * It has not yet been rigorously tested and should be adjusted to take into account the `testedZigVersion` field.
+ * This code is based on `https://gist.github.com/Techatrix/02ce258460d4ca1c8424e600458575b0`.
  */
 async function selectOnDevelopmentBuild(
   env: Env,
@@ -173,51 +230,47 @@ async function selectOnDevelopmentBuild(
   if (
     SemanticVersion.order(zigVersion, oldestReleaseMinimumRuntimeZigVersion) ==
     -1
-  )
+  ) {
     return null;
+  }
 
-  let newest_compatible_entry_index = 0;
-  /** will store the highest Zig version with which a ZLS release has been built with */
-  let maxmimumBuildVersion: SemanticVersion | null = null;
+  // The following algorithm assumes that the Zig version and tested Zig versions are monotonically increasing when iterating over ordered ZLS versions.
 
-  releases.results.forEach((entry, index) => {
+  let selectedEntry: D2JsonData = oldestReleaseData;
+
+  for (const entry of releases.results) {
     const data = JSON.parse(entry.JsonData) as D2JsonData;
     const minimumRuntimeZigVersion = SemanticVersion.parse(
       data.minimumRuntimeZigVersion,
     );
     assert(minimumRuntimeZigVersion);
 
-    assert(data.zigVersion);
-    const entryZigVersion = SemanticVersion.parse(data.zigVersion);
-    assert(entryZigVersion);
+    // TODO deal with failed builds:
+    if (data.artifacts.length === 0) continue;
 
     switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
       case -1:
         // the minimum build version may not be monotonically increasing (i.e a newer release has lower minimum build version) so keep searching
-        return;
+        continue;
       case 0:
       case 1:
-        newest_compatible_entry_index = index;
+        selectedEntry = data;
         break;
     }
+  }
 
-    // the upper bound is usually higher than the version with which ZLS has been built but it is better than having no upper bound.
-    // TODO a more accurate upper bound could be determined by using ZLS's scheduled GitHub CI to periodically bumb the version with which ZLS has been built.
-    if (maxmimumBuildVersion) {
-      switch (SemanticVersion.order(maxmimumBuildVersion, entryZigVersion)) {
-        case -1:
-          maxmimumBuildVersion = entryZigVersion;
-          break;
-        case 0:
-        case 1:
-          break;
-      }
-    } else {
-      maxmimumBuildVersion = entryZigVersion;
-    }
-  });
+  assert(selectedEntry.artifacts.length !== 0);
 
-  assert(newest_compatible_entry_index < releases.results.length);
-  const selectedEntry = releases.results[newest_compatible_entry_index];
-  return JSON.parse(selectedEntry.JsonData) as D2JsonData;
+  const testedZigVersions = Object.entries(selectedEntry.testedZigVersion)
+    .map(([versionString, isSuccess]) => {
+      const semver = SemanticVersion.parse(versionString);
+      assert(semver !== null);
+      return { version: semver, isSuccess: isSuccess };
+    })
+    .sort((lhs, rhs) => SemanticVersion.order(lhs.version, rhs.version));
+  assert(testedZigVersions.length !== 0);
+
+  if (isVersionEnclosedInFailure(testedZigVersions, zigVersion)) return null;
+
+  return selectedEntry;
 }
