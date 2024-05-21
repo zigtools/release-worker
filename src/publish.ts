@@ -382,6 +382,28 @@ export async function handlePublish(
     testedZigVersion: {},
   };
 
+  if (!zlsVersion.isRelease && zlsVersion.commitHeight !== undefined) {
+    const result = await env.ZIGTOOLS_DB.prepare(
+      "SELECT ZLSVersion FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 AND ZLSVersionPatch = ?3 AND ZLSVersionBuildID = ?4",
+    )
+      .bind(
+        zlsVersion.major,
+        zlsVersion.minor,
+        zlsVersion.patch,
+        zlsVersion.commitHeight,
+      )
+      .first<{ ZLSVersion: string; JsonData: string }>();
+
+    if (result !== null && zlsVersionString !== result.ZLSVersion) {
+      return new Response(
+        `ZLS version is '${zlsVersionString}' can't be published because ZLS '${result.ZLSVersion}' has already been published!`,
+        {
+          status: 400, // Bad Request
+        },
+      );
+    }
+  }
+
   await env.ZIGTOOLS_DB.batch([
     env.ZIGTOOLS_DB.prepare(
       "INSERT OR IGNORE INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",

@@ -5,6 +5,7 @@ import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
   D2JsonData,
   searchZLSRelease,
+  SQLiteQueryPlanRow,
   xzMagicNumber,
   zipMagicNumber,
 } from "../src/shared";
@@ -515,14 +516,14 @@ describe("/v1/publish", () => {
     expect(response.status).toBe(400);
   });
 
-  test.todo("publish builds with mismatching commit hashes", async () => {
+  test("publish builds with mismatching commit hashes", async () => {
     {
       const response = await sendPublish({
-        zlsVersion: "0.11.0",
-        zigVersion: "0.11.0",
+        zlsVersion: "0.13.0-dev.1+aaaaaaa",
+        zigVersion: "0.12.0",
         artifacts: [
           [
-            "zls-linux-x86_64-0.11.0.tar.xz",
+            "zls-linux-x86_64-0.13.0-dev.1+aaaaaaa.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -532,52 +533,35 @@ describe("/v1/publish", () => {
     }
 
     {
-      // different Zig version but same file
       const response = await sendPublish({
-        zlsVersion: "0.11.0",
-        zigVersion: "0.11.1",
+        zlsVersion: "0.13.0-dev.1+bbbbbbb",
+        zigVersion: "0.12.0",
         artifacts: [
           [
-            "zls-linux-x86_64-0.11.0.tar.xz",
+            "zls-linux-x86_64-0.13.0-dev.1+bbbbbbb.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
       });
-      expect(await response.text()).toBe("");
-      expect(response.status).toBe(200);
-    }
-
-    {
-      // same Zig version and same file
-      const response = await sendPublish({
-        zlsVersion: "0.11.0",
-        zigVersion: "0.11.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.11.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
-      });
-      expect(await response.text()).toBe("");
-      expect(response.status).toBe(200);
-    }
-
-    {
-      // same Zig version but different file
-      const response = await sendPublish({
-        zlsVersion: "0.11.0",
-        zigVersion: "0.11.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.11.0.tar.xz",
-            new Blob([xzMagicNumber, "binary2"]),
-          ],
-        ],
-      });
-      expect(await response.text()).toBe("TODO");
+      expect(await response.text()).toBe(
+        "ZLS version is '0.13.0-dev.1+bbbbbbb' can't be published because ZLS '0.13.0-dev.1+aaaaaaa' has already been published!",
+      );
       expect(response.status).toBe(400);
     }
+  });
+
+  test("explain query plan when searching for ZLS Version with different commit hash", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT ZLSVersion FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = 0 AND ZLSVersionMinor = 13 AND ZLSVersionPatch = 0 AND ZLSVersionBuildID = 1",
+    ).all<SQLiteQueryPlanRow>();
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=? AND ZLSVersionMajor=? AND ZLSVersionMinor=? AND ZLSVersionPatch=?)",
+      },
+    ]);
   });
 
   test("publish new successfull build then add failures", async () => {
@@ -669,6 +653,71 @@ describe("/v1/publish", () => {
             .update("binary2")
             .digest("hex"),
           file_size: zipMagicNumber.byteLength + 7,
+        },
+      ],
+    });
+  });
+
+  test("publish new successfull build with different Zig versions", async () => {
+    const date = Date.now();
+    vi.setSystemTime(date);
+
+    {
+      const response = await sendPublish({
+        zlsVersion: "0.11.0",
+        zigVersion: "0.11.0",
+        artifacts: [
+          [
+            "zls-linux-x86_64-0.11.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
+      });
+      expect(await response.text()).toBe("");
+      expect(response.status).toBe(200);
+    }
+
+    {
+      const response = await sendPublish({
+        zlsVersion: "0.11.0",
+        zigVersion: "0.11.1",
+        artifacts: [
+          [
+            "zls-linux-x86_64-0.11.0.tar.xz",
+            new Blob([xzMagicNumber, "binary2"]),
+          ],
+          [
+            "zls-windows-aarch64-0.11.0.zip",
+            new Blob([zipMagicNumber, "binary2"]),
+          ],
+        ],
+      });
+      expect(await response.text()).toBe("");
+      expect(response.status).toBe(200);
+    }
+
+    const jsonData = await searchZLSRelease(env, "0.11.0");
+    expect(jsonData).toStrictEqual<D2JsonData>({
+      date: date,
+      zlsVersion: "0.11.0",
+      zigVersion: "0.11.0",
+      minimumBuildZigVersion: "0.11.0",
+      minimumRuntimeZigVersion: "0.11.0",
+      testedZigVersion: {
+        "0.11.0": true,
+        "0.11.1": true,
+      },
+      artifacts: [
+        {
+          arch: "x86_64",
+          os: "linux",
+          version: "0.11.0",
+          extension: "tar.xz",
+          file_shasum: createHash("sha256")
+            .update(xzMagicNumber)
+            .update("binary1")
+            .digest("hex"),
+          file_size: xzMagicNumber.byteLength + 7,
         },
       ],
     });

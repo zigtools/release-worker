@@ -287,6 +287,7 @@ describe("/v1/select-zls-version", () => {
       ["0.12.0-dev.15+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
       ["0.12.0-dev.17+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
       ["0.12.0-dev.18+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
+      ["0.15.0", null],
     ])("Zig %s -> ZLS %s", async (zigVersion, expectedZLSVersion) => {
       const response = await selectZLSVersion(zigVersion);
       expect(response?.version ?? null).toBe(expectedZLSVersion);
