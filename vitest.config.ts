@@ -1,10 +1,10 @@
 import path from "node:path";
 import {
-  defineWorkersProject,
+  defineWorkersConfig,
   readD1Migrations,
 } from "@cloudflare/vitest-pool-workers/config";
 
-export default defineWorkersProject(async () => {
+export default defineWorkersConfig(async () => {
   // Read all migrations in the `migrations` directory
   const migrationsPath = path.join(__dirname, "migrations");
   const migrations = await readD1Migrations(migrationsPath);
@@ -12,9 +12,12 @@ export default defineWorkersProject(async () => {
   return {
     test: {
       setupFiles: ["./test/apply-migrations.ts"],
+      coverage: {
+        provider: "istanbul",
+        reporter: ["text", "json", "html"],
+      },
       poolOptions: {
         workers: {
-          singleWorker: true,
           wrangler: { configPath: "./wrangler.toml" },
           miniflare: {
             bindings: { TEST_MIGRATIONS: migrations },
