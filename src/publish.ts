@@ -382,6 +382,23 @@ export async function handlePublish(
     testedZigVersion: {},
   };
 
+  if (artifacts.length === 0) {
+    const result = await env.ZIGTOOLS_DB.prepare(
+      "SELECT * FROM ZLSReleases WHERE ZLSVersion = ?1",
+    )
+      .bind(zlsVersionString)
+      .first();
+
+    if (result === null) {
+      return new Response(
+        `ZLS version '${zlsVersionString}' is new and has not artifacts. A new ZLS build can't be failed!`,
+        {
+          status: 400, // Bad Request
+        },
+      );
+    }
+  }
+
   if (!zlsVersion.isRelease && zlsVersion.commitHeight !== undefined) {
     const result = await env.ZIGTOOLS_DB.prepare(
       "SELECT ZLSVersion FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 AND ZLSVersionPatch = ?3 AND ZLSVersionBuildID = ?4",
@@ -392,7 +409,7 @@ export async function handlePublish(
         zlsVersion.patch,
         zlsVersion.commitHeight,
       )
-      .first<{ ZLSVersion: string; JsonData: string }>();
+      .first<{ ZLSVersion: string }>();
 
     if (result !== null && zlsVersionString !== result.ZLSVersion) {
       return new Response(

@@ -77,7 +77,6 @@ export async function handleSelectZLSVersion(
 
     for (const entry of result.results) {
       const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
-      assert(jsonData.date !== null); // a tagged release is never failed
       response[jsonData.zlsVersion] = {
         date: new Date(jsonData.date).toISOString().slice(0, 10),
         ...artifactsToRecord(env, jsonData.artifacts),
@@ -244,9 +243,7 @@ async function selectOnDevelopmentBuild(
       data.minimumRuntimeZigVersion,
     );
     assert(minimumRuntimeZigVersion);
-
-    // TODO deal with failed builds:
-    if (data.artifacts.length === 0) continue;
+    assert(data.artifacts.length !== 0);
 
     switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
       case -1:
@@ -258,8 +255,6 @@ async function selectOnDevelopmentBuild(
         break;
     }
   }
-
-  assert(selectedEntry.artifacts.length !== 0);
 
   const testedZigVersions = Object.entries(selectedEntry.testedZigVersion)
     .map(([versionString, isSuccess]) => {

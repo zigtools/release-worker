@@ -7,19 +7,14 @@ export const xzMagicNumber = Buffer.from("FD377A585A00", "hex");
 export const zipMagicNumber = Buffer.from("504B0304", "hex");
 
 export interface D2JsonData {
-  /** unix timestamp; only set when `targets.length !== 0` */
-  date: number | null;
+  date: number;
   zlsVersion: string;
-  /**
-   * The Zig version with which the artifacts have been compiled.
-   * Only set when `targets.length !== 0`
-   */
-  zigVersion: string | null;
+  /** The Zig version with which the artifacts have been compiled. */
+  zigVersion: string;
   minimumBuildZigVersion: string;
   minimumRuntimeZigVersion: string;
-  /** Always contains the `zigVersion` if it is available. */
+  /** Always contains the `zigVersion` */
   testedZigVersion: Record<string, boolean>;
-  /** no artifacts indicates a failure. Never empty when `zlsVersion.isRelease`. */
   artifacts: ReleaseArtifact[];
 }
 

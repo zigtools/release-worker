@@ -478,6 +478,19 @@ describe("/v1/publish", () => {
     expect(response.status).toBe(400);
   });
 
+  test("disallow publishing a new failed build", async () => {
+    const response = await sendPublish({
+      zlsVersion: "0.1.0-dev",
+      zigVersion: "0.1.0",
+      artifacts: [],
+    });
+
+    expect(await response.text()).toBe(
+      "ZLS version '0.1.0-dev' is new and has not artifacts. A new ZLS build can't be failed!",
+    );
+    expect(response.status).toBe(400);
+  });
+
   test("disallow publishing partial minisigns", async () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0",
@@ -583,6 +596,17 @@ describe("/v1/publish", () => {
             new Blob([zipMagicNumber, "binary2"]),
           ],
         ],
+      });
+      expect(await response.text()).toBe("");
+      expect(response.status).toBe(200);
+    }
+
+    {
+      // failed build with 0.1.2
+      const response = await sendPublish({
+        zlsVersion: "0.1.0-dev",
+        zigVersion: "0.1.2",
+        artifacts: [],
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
