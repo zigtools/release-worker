@@ -1,3 +1,5 @@
+import assert from "node:assert";
+
 export class SemanticVersion {
   major!: number;
   minor!: number;
@@ -17,13 +19,13 @@ export class SemanticVersion {
 
     const semver = new SemanticVersion();
     semver.major = parseInt(match[1]);
-    if (isNaN(semver.major)) return null;
+    assert(!isNaN(semver.major));
 
     semver.minor = parseInt(match[2]);
-    if (isNaN(semver.minor)) return null;
+    assert(!isNaN(semver.minor));
 
     semver.patch = parseInt(match[3]);
-    if (isNaN(semver.patch)) return null;
+    assert(!isNaN(semver.patch));
 
     semver.isRelease = !match[4] && !match[5];
 
@@ -52,7 +54,8 @@ export class SemanticVersion {
     if (lhs.patch < rhs.patch) return -1;
     if (lhs.patch > rhs.patch) return 1;
 
-    if (!lhs.commitHeight || !rhs.commitHeight) return 0;
+    if (lhs.commitHeight === undefined) return 0;
+    if (rhs.commitHeight === undefined) return 0;
 
     if (lhs.commitHeight < rhs.commitHeight) return -1;
     if (lhs.commitHeight > rhs.commitHeight) return 1;
