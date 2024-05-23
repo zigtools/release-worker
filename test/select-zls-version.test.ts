@@ -34,6 +34,18 @@ const default_artifacts: ReleaseArtifact[] = [
 const samples: D2JsonData[] = [
   {
     date: 0,
+    zlsVersion: "0.9.0-dev.3+aaaaaaaaa",
+    zigVersion: "0.9.0-dev.20+aaaaaaaaa",
+    minimumBuildZigVersion: "0.9.0-dev.25+aaaaaaaaa",
+    minimumRuntimeZigVersion: "0.9.0-dev.15+aaaaaaaaa",
+    artifacts: default_artifacts,
+    testedZigVersion: {
+      "0.9.0-dev.20+aaaaaaaaa": true,
+      "0.9.0-dev.25+aaaaaaaaa": true,
+    },
+  },
+  {
+    date: 0,
     zlsVersion: "0.11.0",
     zigVersion: "0.11.0",
     minimumBuildZigVersion: "0.11.0",
@@ -266,8 +278,15 @@ describe("/v1/select-zls-version", () => {
     });
 
     test.each<[string, string | null]>([
+      ["0.9.0-dev.10+aaaaaaaaa", null],
+      ["0.9.0-dev.15+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.20+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.25+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.30+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
       ["0.10.0", null],
+      ["0.10.0-dev.5+aaaaaaaaa", null],
       ["0.11.0", "0.11.0"],
+      ["0.11.0-dev.5+aaaaaaaaa", null],
       ["0.11.1", "0.11.0"],
       ["0.12.0", "0.12.1"],
       ["0.12.1", "0.12.1"],
