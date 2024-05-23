@@ -135,21 +135,20 @@ describe("/v1/publish", () => {
   });
 
   describe("validate request body", () => {
-    test("missing zls-version", async () => {
-      const form = new FormData();
-      // form.set("zls-version", "0.1.0");
-      form.set("zig-version", "0.1.0");
-      const response = await sendPublishForm(form);
-      expect(await response.text()).toBe("Missing form item 'zls-version'!");
-      expect(response.status).toBe(400);
-    });
-
-    test("missing zig-version", async () => {
+    test.each<string>([
+      "zig-version",
+      "zls-version",
+      "minimum-build-zig-version",
+      "minimum-runtime-zig-version",
+    ])("test missing %s field", async (fieldName) => {
       const form = new FormData();
       form.set("zls-version", "0.1.0");
-      // form.set("zig-version", "0.1.0");
+      form.set("zig-version", "0.1.0");
+      form.set("minimum-build-zig-version", "0.1.0");
+      form.set("minimum-runtime-zig-version", "0.1.0");
+      form.delete(fieldName);
       const response = await sendPublishForm(form);
-      expect(await response.text()).toBe("Missing form item 'zig-version'!");
+      expect(await response.text()).toBe(`Missing form item '${fieldName}'!`);
       expect(response.status).toBe(400);
     });
 
@@ -255,6 +254,50 @@ describe("/v1/publish", () => {
       },
     );
 
+    test("validate that artifact is a file", async () => {
+      const form = new FormData();
+      form.set("zls-version", "0.1.0");
+      form.set("zig-version", "0.1.0");
+      form.set("minimum-build-zig-version", "0.1.0");
+      form.set("minimum-runtime-zig-version", "0.1.0");
+      form.set("zls-linux-x86_64-0.1.0.tar.xz", "foo");
+      const response = await sendPublishForm(form);
+      expect(await response.text()).toBe(
+        `artifact 'zls-linux-x86_64-0.1.0.tar.xz' must be encoded as a file!`,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test("validate that artifact file name matches form key", async () => {
+      const form = new FormData();
+      form.set("zls-version", "0.1.0");
+      form.set("zig-version", "0.1.0");
+      form.set("minimum-build-zig-version", "0.1.0");
+      form.set("minimum-runtime-zig-version", "0.1.0");
+      form.set(
+        "zls-linux-x86_64-0.1.0.tar.xz",
+        new Blob([xzMagicNumber, "foo"]),
+        "zls-windows-aarch64-0.1.0.zip",
+      );
+      const response = await sendPublishForm(form);
+      expect(await response.text()).toBe(
+        `artifact key 'zls-linux-x86_64-0.1.0.tar.xz' must match the file name but got 'zls-windows-aarch64-0.1.0.zip'!`,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test("validate that artifact is not empty", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [["zls-linux-x86_64-0.1.0.tar.xz", new Blob()]],
+      });
+      expect(await response.text()).toBe(
+        "artifact 'zls-linux-x86_64-0.1.0.tar.xz' can't be empty!",
+      );
+      expect(response.status).toBe(400);
+    });
+
     test("validate file magic number response body", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
@@ -297,6 +340,44 @@ describe("/v1/publish", () => {
       } else {
         expect(response.status).toBe(400);
       }
+    });
+
+    test("validate that all artifacts have the same version", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [
+          [
+            "zls-linux-x86_64-0.1.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+          [
+            "zls-linux-x86_64-0.2.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
+      });
+      expect(await response.text()).toBe(
+        "all artifacts must have the same version!",
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test("validate that artifact version in file name matches ZLS version", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [
+          [
+            "zls-linux-x86_64-0.2.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
+      });
+      expect(await response.text()).toBe(
+        "ZLS version is '0.1.0' but all artifacts have the version '0.2.0'",
+      );
+      expect(response.status).toBe(400);
     });
 
     test.each<[string, string, "ok" | "bad"]>([
