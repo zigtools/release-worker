@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { assert } from "vitest";
+import assert from "node:assert";
 import { Env } from "./env";
 import { SemanticVersion } from "./semantic-version";
 
