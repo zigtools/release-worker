@@ -4,16 +4,17 @@ export class SemanticVersion {
   major!: number;
   minor!: number;
   patch!: number;
-  /** `isRelease` implies `!commitHeight && !commitID` */
+  /** `isRelease` <=> `!commitHeight && !commitID` */
   isRelease!: boolean;
-  /** may be `undefined` even if `isRelease` */
+  /** `isRelease` <=> `!commitHeight` */
   commitHeight?: number;
+  /** `isRelease` <=> `!commitID` */
   commitID?: string;
 
   public static parse(string: string): SemanticVersion | null {
-    /** https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string */
+    /** adapted from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string */
     const regex =
-      /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+      /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-dev\.(\d+)\+([0-9a-fA-F]{7,9}))?$/;
     const match = string.match(regex);
     if (!match) return null;
 
@@ -27,17 +28,13 @@ export class SemanticVersion {
     semver.patch = parseInt(match[3]);
     assert(!isNaN(semver.patch));
 
-    semver.isRelease = !match[4] && !match[5];
+    assert(!match[4] == !match[5]);
+    semver.isRelease = !match[4];
 
-    const pre = match[4];
-    if (pre) {
-      const [dev, commitHeightString] = pre.split(".");
-      if (dev !== "dev") return null;
-      if (commitHeightString) {
-        semver.commitHeight = parseInt(commitHeightString);
-        if (isNaN(semver.commitHeight)) return null;
-      }
-    }
+    if (!match[4]) return semver;
+
+    semver.commitHeight = parseInt(match[4]);
+    assert(!isNaN(semver.commitHeight));
 
     semver.commitID = match[5];
 
@@ -54,8 +51,10 @@ export class SemanticVersion {
     if (lhs.patch < rhs.patch) return -1;
     if (lhs.patch > rhs.patch) return 1;
 
-    if (lhs.commitHeight === undefined) return 0;
-    if (rhs.commitHeight === undefined) return 0;
+    if (lhs.commitHeight === undefined && rhs.commitHeight === undefined)
+      return 0;
+    if (lhs.commitHeight === undefined) return 1;
+    if (rhs.commitHeight === undefined) return -1;
 
     if (lhs.commitHeight < rhs.commitHeight) return -1;
     if (lhs.commitHeight > rhs.commitHeight) return 1;
@@ -66,7 +65,7 @@ export class SemanticVersion {
   public toString(): string {
     const a = `${this.major.toString()}.${this.minor.toString()}.${this.patch.toString()}`;
     if (this.isRelease) return a;
-    if (!this.commitHeight || !this.commitID) return `${a}-dev`;
+    assert(this.commitHeight && this.commitID);
     return `${a}-dev.${this.commitHeight.toString()}+${this.commitID}`;
   }
 

@@ -104,7 +104,7 @@ function expectSemverFormItem(
       null,
       null,
       new Response(
-        `form item '${name}' with value '${versionString}' is not a valid semantic version!`,
+        `form item '${name}' with value '${versionString}' is not a valid version!`,
         {
           status: 400, // Bad Request
         },
@@ -272,7 +272,7 @@ export async function handlePublish(
 
     if (!SemanticVersion.parse(version)) {
       return new Response(
-        `artifact '${key}' has an invalid semantic version '${version}'!`,
+        `artifact '${key}' has an invalid version '${version}'!`,
         {
           status: 400, // Bad Request
         },

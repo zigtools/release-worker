@@ -94,7 +94,7 @@ export async function handleSelectZLSVersion(
 
   if (!zigVersion) {
     return new Response(
-      `Query component 'zig_version' with value '${zigVersionString}' is not a valid semantic version!`,
+      `Query component 'zig_version' with value '${zigVersionString}' is not a valid version!`,
       {
         status: 400, // Bad Request
       },

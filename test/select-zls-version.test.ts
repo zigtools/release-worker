@@ -161,7 +161,7 @@ describe("/v1/select-zls-version", () => {
       "https://example.com/v1/select-zls-version?zig_version=foo",
     );
     expect(await response.text()).toBe(
-      "Query component 'zig_version' with value 'foo' is not a valid semantic version!",
+      "Query component 'zig_version' with value 'foo' is not a valid version!",
     );
     expect(response.status).toBe(400);
   });

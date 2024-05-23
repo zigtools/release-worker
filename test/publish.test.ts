@@ -172,7 +172,7 @@ describe("/v1/publish", () => {
       ["", "bad"],
       ["some string", "bad"],
       ["0.1.0", "ok"],
-      ["0.1.0-dev", "ok"],
+      ["0.1.0-dev.1+aaaaaaa", "ok"],
     ])("validate ZLS version: %j -> %s", async (zlsVersion, kind) => {
       const response = await sendPublish({
         zlsVersion: zlsVersion,
@@ -189,7 +189,7 @@ describe("/v1/publish", () => {
         expect(response.status).toBe(200);
       } else {
         expect(await response.text()).toBe(
-          `form item 'zls-version' with value '${zlsVersion}' is not a valid semantic version!`,
+          `form item 'zls-version' with value '${zlsVersion}' is not a valid version!`,
         );
         expect(response.status).toBe(400);
       }
@@ -199,14 +199,14 @@ describe("/v1/publish", () => {
       ["", "bad"],
       ["some string", "bad"],
       ["0.1.0", "ok"],
-      ["0.1.0-dev", "ok"],
+      ["0.1.0-dev.1+aaaaaaaaa", "ok"],
     ])("validate Zig version: %s -> %s", async (zigVersion, expected) => {
       const response = await sendPublish({
-        zlsVersion: "0.1.0-dev",
+        zlsVersion: "0.1.0-dev.1+aaaaaaaaa",
         zigVersion: zigVersion,
         artifacts: [
           [
-            `zls-linux-x86_64-0.1.0-dev.tar.xz`,
+            `zls-linux-x86_64-0.1.0-dev.1+aaaaaaaaa.tar.xz`,
             new Blob([xzMagicNumber, "binary1"]),
           ],
         ],
@@ -216,7 +216,7 @@ describe("/v1/publish", () => {
         expect(response.status).toBe(200);
       } else {
         expect(await response.text()).toBe(
-          `form item 'zig-version' with value '${zigVersion}' is not a valid semantic version!`,
+          `form item 'zig-version' with value '${zigVersion}' is not a valid version!`,
         );
         expect(response.status).toBe(400);
       }
@@ -384,10 +384,10 @@ describe("/v1/publish", () => {
       ["0.1.0", "0.1.0", "ok"],
       ["0.1.0", "0.1.1", "ok"],
       ["0.1.1", "0.1.0", "ok"],
-      ["0.1.0", "0.1.0-dev", "bad"],
-      ["0.1.1-dev", "0.1.0", "bad"],
-      ["0.1.0-dev", "0.1.0", "ok"],
-      ["0.1.0-dev", "0.1.0-dev", "ok"],
+      ["0.1.0", "0.1.0-dev.1+aaaaaaa", "bad"],
+      ["0.1.1-dev.1+aaaaaaa", "0.1.0", "bad"],
+      ["0.1.0-dev.1+aaaaaaa", "0.1.0", "ok"],
+      ["0.1.0-dev.1+aaaaaaa", "0.1.0-dev.1+aaaaaaaaa", "ok"],
     ])(
       "validate compatibility: ZLS %s Zig %s -> %s",
       async (zlsVersion, zigVersion, expected) => {
@@ -417,6 +417,17 @@ describe("/v1/publish", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  test("search for builds", async () => {
+    {
+      const jsonData = await searchZLSRelease(env, "");
+      expect(jsonData).toBe(null);
+    }
+    {
+      const jsonData = await searchZLSRelease(env, "0.1.0");
+      expect(jsonData).toBe(null);
+    }
   });
 
   test("publish new successfull build", async () => {
@@ -577,13 +588,13 @@ describe("/v1/publish", () => {
 
   test("disallow publishing a new failed build", async () => {
     const response = await sendPublish({
-      zlsVersion: "0.1.0-dev",
+      zlsVersion: "0.1.0-dev.1+aaaaaaa",
       zigVersion: "0.1.0",
       artifacts: [],
     });
 
     expect(await response.text()).toBe(
-      "ZLS version '0.1.0-dev' is new and has not artifacts. A new ZLS build can't be failed!",
+      "ZLS version '0.1.0-dev.1+aaaaaaa' is new and has not artifacts. A new ZLS build can't be failed!",
     );
     expect(response.status).toBe(400);
   });
@@ -599,7 +610,7 @@ describe("/v1/publish", () => {
         ],
         ["zls-linux-x86_64-0.11.0.tar.xz.minisign", new Blob(["something"])],
         [
-          "zls-windows-aarch64-0.1.0-dev.zip",
+          "zls-windows-aarch64-0.11.0.zip",
           new Blob([zipMagicNumber, "binary2"]),
         ],
       ],
@@ -681,15 +692,15 @@ describe("/v1/publish", () => {
     {
       // successfull build with Zig 0.1.1
       const response = await sendPublish({
-        zlsVersion: "0.1.0-dev",
+        zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.1",
         artifacts: [
           [
-            "zls-linux-x86_64-0.1.0-dev.tar.xz",
+            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
           [
-            "zls-windows-aarch64-0.1.0-dev.zip",
+            "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip",
             new Blob([zipMagicNumber, "binary2"]),
           ],
         ],
@@ -701,7 +712,7 @@ describe("/v1/publish", () => {
     {
       // failed build with 0.1.2
       const response = await sendPublish({
-        zlsVersion: "0.1.0-dev",
+        zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.2",
         artifacts: [],
       });
@@ -712,15 +723,15 @@ describe("/v1/publish", () => {
     {
       // successfull build with 0.1.2
       const response = await sendPublish({
-        zlsVersion: "0.1.0-dev",
+        zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.2",
         artifacts: [
           [
-            "zls-linux-x86_64-0.1.0-dev.tar.xz",
+            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz",
             new Blob([xzMagicNumber, "binary3"]),
           ],
           [
-            "zls-windows-aarch64-0.1.0-dev.zip",
+            "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip",
             new Blob([zipMagicNumber, "binary4"]),
           ],
         ],
@@ -732,7 +743,7 @@ describe("/v1/publish", () => {
     {
       // failed build with 0.1.3
       const response = await sendPublish({
-        zlsVersion: "0.1.0-dev",
+        zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.3",
         artifacts: [],
       });
@@ -740,10 +751,10 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(200);
     }
 
-    const jsonData = await searchZLSRelease(env, "0.1.0-dev");
+    const jsonData = await searchZLSRelease(env, "0.1.0-dev.1+aaaaaaa");
     expect(jsonData).toStrictEqual<D2JsonData>({
       date: date,
-      zlsVersion: "0.1.0-dev",
+      zlsVersion: "0.1.0-dev.1+aaaaaaa",
       zigVersion: "0.1.1",
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
@@ -756,7 +767,7 @@ describe("/v1/publish", () => {
         {
           arch: "x86_64",
           os: "linux",
-          version: "0.1.0-dev",
+          version: "0.1.0-dev.1+aaaaaaa",
           extension: "tar.xz",
           file_shasum: createHash("sha256")
             .update(xzMagicNumber)
@@ -767,7 +778,7 @@ describe("/v1/publish", () => {
         {
           arch: "aarch64",
           os: "windows",
-          version: "0.1.0-dev",
+          version: "0.1.0-dev.1+aaaaaaa",
           extension: "zip",
           file_shasum: createHash("sha256")
             .update(zipMagicNumber)

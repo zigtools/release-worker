@@ -7,24 +7,29 @@ test.each<string>([
   "0",
   "0.0",
   "0.0.",
-  "0.0-dev",
-  "1.0.0-dav.1+aaaaaaaaa",
-  "1.0.0+dev.1+aaaaaaaaa",
-  "1.0.0-dev.bob+aaaaaaaaa",
-])("valid %s? -> %j", (versionString) => {
+  "0.0.0-dev",
+  "0.0.0+dev",
+  "0.0.0-dev.",
+  "0.0.0+dev.",
+  "0.0.0-dev.1",
+  "0.0.0+dev.1",
+  "1.0.0-dev+aaaaaaaaa",
+  "1.0.0-dev.1-aaaaaaaaa",
+  "1.0.0-dev.1+aaaaa",
+  "1.0.0-dev.1+aaaaaaaaaaaaa",
+])("invalid %s? -> %j", (versionString) => {
   const version = SemanticVersion.parse(versionString);
   expect(version).toBeNull();
 });
 
 test.each<string>([
   "0.0.0",
-  "0.0.0-dev",
-  // TODO reject these versions
-  "1.0.0-dev+aaaaaaaaa",
-  "1.0.0-dev.1+aaaaaaaaa",
-  "1.0.0-dev.1-aaaaaaaaa",
-  "1.0.0-dev.1",
-  "1.0.0-dev",
+  "0.0.0-dev.1+aaaaaaaaa",
+  "0.0.0-dev.20+aaaaaaaaa",
+  "0.0.0-dev.1+abcdef123",
+  "0.13.0-dev.249+ed75f6256",
+  "0.13.0-dev.34+93b7bbd",
+  "0.12.0-dev.722+412d863ba",
 ])("valid %s", (versionString) => {
   const version = SemanticVersion.parse(versionString);
   expect(version).toBeTruthy();
@@ -43,10 +48,8 @@ test.each<[string, "<" | "=" | ">", string]>([
   ["0.0.1", "=", "0.0.1"],
   ["0.0.1", ">", "0.0.0"],
 
-  ["1.0.0-dev", "=", "1.0.0-dev"],
-
-  ["1.0.0-dev", "=", "1.0.0-dev.1+aaaaaaaaa"],
-  ["1.0.0-dev.1+aaaaaaaaa", "=", "1.0.0-dev"],
+  ["1.0.0", ">", "1.0.0-dev.1+aaaaaaaaa"],
+  ["1.0.0-dev.1+aaaaaaaaa", "<", "1.0.0"],
 
   ["1.0.0-dev.0+aaaaaaaaa", "<", "1.0.0-dev.1+aaaaaaaaa"],
   ["1.0.0-dev.1+aaaaaaaaa", "=", "1.0.0-dev.1+aaaaaaaaa"],
