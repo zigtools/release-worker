@@ -153,6 +153,22 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
+    test("validate response is empty body", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [
+          [
+            `zls-linux-x86_64-0.1.0.tar.xz`,
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
+      });
+
+      expect(response.body).toBe(null);
+      expect(response.status).toBe(200);
+    });
+
     test.each<[string, "ok" | "bad"]>([
       ["", "bad"],
       ["some string", "bad"],

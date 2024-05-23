@@ -474,7 +474,7 @@ export async function handlePublish(
 
   await Promise.all(promises);
 
-  return new Response(null, {
+  return new Response(undefined, {
     status: 200, // Ok
   });
 }
