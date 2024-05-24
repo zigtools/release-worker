@@ -197,13 +197,13 @@ describe("/v1/select-zls-version", () => {
         return env.ZIGTOOLS_DB.prepare(
           "INSERT INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
         ).bind(
-          sample.zlsVersion,
-          zlsVersion.major,
-          zlsVersion.minor,
-          zlsVersion.patch,
-          zlsVersion.commitHeight ?? null,
-          zlsVersion.isRelease,
-          JSON.stringify(sample),
+          sample.zlsVersion satisfies string,
+          zlsVersion.major satisfies number,
+          zlsVersion.minor satisfies number,
+          zlsVersion.patch satisfies number,
+          (zlsVersion.commitHeight ?? null) satisfies number | null,
+          zlsVersion.isRelease satisfies boolean,
+          JSON.stringify(sample satisfies D2JsonData),
         );
       });
       await env.ZIGTOOLS_DB.batch(statements);

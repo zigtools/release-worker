@@ -426,13 +426,13 @@ export async function handlePublish(
     env.ZIGTOOLS_DB.prepare(
       "INSERT OR IGNORE INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
     ).bind(
-      zlsVersionString,
-      zlsVersion.major,
-      zlsVersion.minor,
-      zlsVersion.patch,
-      zlsVersion.commitHeight ?? null,
-      zlsVersion.isRelease,
-      JSON.stringify(newEntryValue),
+      zlsVersionString satisfies string,
+      zlsVersion.major satisfies number,
+      zlsVersion.minor satisfies number,
+      zlsVersion.patch satisfies number,
+      (zlsVersion.commitHeight ?? null) satisfies number | null,
+      zlsVersion.isRelease satisfies boolean,
+      JSON.stringify(newEntryValue satisfies D2JsonData),
     ),
     env.ZIGTOOLS_DB.prepare(
       "UPDATE ZLSReleases SET JsonData = json_patch(JsonData, json(?2)) WHERE ZLSVersion = ?1",
