@@ -22,7 +22,7 @@ export class SemanticVersion {
     const regex =
       /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-dev\.(\d+)\+([0-9a-fA-F]{7,9}))?$/;
     const match = string.match(regex);
-    if (!match) return null;
+    if (match === null) return null;
 
     const semver = new SemanticVersion();
     semver.major = parseInt(match[1]);
@@ -71,7 +71,7 @@ export class SemanticVersion {
   public toString(): string {
     const a = `${this.major.toString()}.${this.minor.toString()}.${this.patch.toString()}`;
     if (this.isRelease) return a;
-    assert(this.commitHeight && this.commitID);
+    assert(this.commitHeight !== undefined && this.commitID !== undefined);
     return `${a}-dev.${this.commitHeight.toString()}+${this.commitID}`;
   }
 

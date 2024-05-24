@@ -18,7 +18,7 @@ async function searchZLSRelease(
   )
     .bind(zlsVersion)
     .first<string>("JsonData");
-  if (!jsonString) return null;
+  if (jsonString === null) return null;
   return JSON.parse(jsonString) as D2JsonData;
 }
 

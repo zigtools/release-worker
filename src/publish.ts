@@ -23,7 +23,7 @@ function checkRequestAuthentication(
   expectedPassword: Buffer,
 ): Response | "ok" {
   const authorization = request.headers.get("Authorization");
-  if (!authorization) {
+  if (authorization === null) {
     return new Response("Authorization failed", {
       status: 401, // Unauthorized
       headers: {
@@ -240,14 +240,14 @@ export async function handlePublish(
     }
 
     if (key.endsWith(".minisign")) {
-      assert(!artifactMinisigns[key]); // keys are unique
+      assert(artifactMinisigns[key] === undefined); // keys are unique
       artifactMinisigns[key] = file;
       continue;
     }
 
     const match = key.match(artifactRegex);
 
-    if (!match) {
+    if (match === null) {
       return new Response(`failed to parse artifact '${key}'!`, {
         status: 400, // Bad Request
       });
@@ -264,7 +264,7 @@ export async function handlePublish(
     //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${file_hash.digest("hex")}, size=${value.size.toString()}`,
     // );
 
-    if (!SemanticVersion.parse(version)) {
+    if (SemanticVersion.parse(version) === null) {
       return new Response(
         `artifact '${key}' has an invalid version '${version}'!`,
         {

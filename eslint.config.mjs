@@ -16,5 +16,18 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      "no-shadow": "off",
+      "@typescript-eslint/no-shadow": "error",
+      "@typescript-eslint/strict-boolean-expressions": [
+        "error",
+        {
+          allowString: true,
+          allowNumber: false,
+          allowNullableObject: false,
+        },
+      ],
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
+    },
   },
 );

@@ -92,7 +92,7 @@ export async function handleSelectZLSVersion(
 
   const zigVersion = SemanticVersion.parse(zigVersionString);
 
-  if (!zigVersion) {
+  if (zigVersion === null) {
     return new Response(
       `Query component 'zig_version' with value '${zigVersionString}' is not a valid version!`,
       {
@@ -139,7 +139,7 @@ async function selectOnTaggedRelease(
     .bind(zigVersion.major, zigVersion.minor)
     .first<{ JsonData: string }>();
 
-  if (!selectedRelease) return null;
+  if (selectedRelease === null) return null;
   return JSON.parse(selectedRelease.JsonData) as D2JsonData;
 }
 
@@ -221,7 +221,7 @@ async function selectOnDevelopmentBuild(
     .bind(zigVersion.major, zigVersion.minor)
     .all<{ JsonData: string }>();
 
-  if (!releases.results.length) return null;
+  if (releases.results.length === 0) return null;
 
   const oldestRelease = releases.results[0];
   const oldestReleaseData = JSON.parse(oldestRelease.JsonData) as D2JsonData;
