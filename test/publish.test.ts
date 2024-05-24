@@ -4,12 +4,23 @@ import { createHash } from "node:crypto";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
   D2JsonData,
-  searchZLSRelease,
   SQLiteQueryPlanRow,
   xzMagicNumber,
   zipMagicNumber,
 } from "../src/shared";
 import { handlePublish } from "../src/publish";
+
+async function searchZLSRelease(
+  zlsVersion: string,
+): Promise<D2JsonData | null> {
+  const jsonString = await env.ZIGTOOLS_DB.prepare(
+    "SELECT JsonData FROM ZLSReleases WHERE ZLSVersion = ?1",
+  )
+    .bind(zlsVersion)
+    .first<string>("JsonData");
+  if (!jsonString) return null;
+  return JSON.parse(jsonString) as D2JsonData;
+}
 
 async function sendPublishForm(form: FormData): Promise<Response> {
   assert(typeof env.API_TOKEN === "string" && env.API_TOKEN);
@@ -421,11 +432,11 @@ describe("/v1/publish", () => {
 
   test("search for builds", async () => {
     {
-      const jsonData = await searchZLSRelease(env, "");
+      const jsonData = await searchZLSRelease("");
       expect(jsonData).toBe(null);
     }
     {
-      const jsonData = await searchZLSRelease(env, "0.1.0");
+      const jsonData = await searchZLSRelease("0.1.0");
       expect(jsonData).toBe(null);
     }
   });
@@ -449,7 +460,7 @@ describe("/v1/publish", () => {
     expect(await response.text()).toBe("");
     expect(response.status).toBe(200);
 
-    const jsonData = await searchZLSRelease(env, "0.1.0");
+    const jsonData = await searchZLSRelease("0.1.0");
     expect(jsonData).toStrictEqual<D2JsonData>({
       date: date,
       zlsVersion: "0.1.0",
@@ -536,7 +547,7 @@ describe("/v1/publish", () => {
     expect(await response.text()).toBe("");
     expect(response.status).toBe(200);
 
-    const jsonData = await searchZLSRelease(env, "0.1.0");
+    const jsonData = await searchZLSRelease("0.1.0");
     expect(jsonData).toStrictEqual<D2JsonData>({
       date: date,
       zlsVersion: "0.1.0",
@@ -753,7 +764,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(200);
     }
 
-    const jsonData = await searchZLSRelease(env, "0.1.0-dev.1+aaaaaaa");
+    const jsonData = await searchZLSRelease("0.1.0-dev.1+aaaaaaa");
     expect(jsonData).toStrictEqual<D2JsonData>({
       date: date,
       zlsVersion: "0.1.0-dev.1+aaaaaaa",
@@ -831,7 +842,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(200);
     }
 
-    const jsonData = await searchZLSRelease(env, "0.11.0");
+    const jsonData = await searchZLSRelease("0.11.0");
     expect(jsonData).toStrictEqual<D2JsonData>({
       date: date,
       zlsVersion: "0.11.0",

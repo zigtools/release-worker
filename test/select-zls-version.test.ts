@@ -1,16 +1,13 @@
 import { env, SELF } from "cloudflare:test";
+import assert from "node:assert";
 import { describe, test, expect, beforeEach } from "vitest";
-import {
-  D2JsonData,
-  insertZLSRelease,
-  ReleaseArtifact,
-  SQLiteQueryPlanRow,
-} from "../src/shared";
+import { D2JsonData, ReleaseArtifact, SQLiteQueryPlanRow } from "../src/shared";
 import {
   handleSelectZLSVersion,
   SelectZLSVersionWithoutVersionResponse,
   SelectZLSVersionWithVersionResponse,
 } from "../src/select-zls-version";
+import { SemanticVersion } from "../src/semantic-version";
 
 const default_artifacts: ReleaseArtifact[] = [
   {
@@ -193,7 +190,23 @@ describe("/v1/select-zls-version", () => {
   describe("test on sample database", () => {
     beforeEach(async () => {
       shuffleArray(samples);
-      for (const sample of samples) await insertZLSRelease(env, sample);
+      const statements = samples.map((sample) => {
+        const zlsVersion = SemanticVersion.parse(sample.zlsVersion);
+        assert(zlsVersion !== null);
+
+        return env.ZIGTOOLS_DB.prepare(
+          "INSERT INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
+        ).bind(
+          sample.zlsVersion,
+          zlsVersion.major,
+          zlsVersion.minor,
+          zlsVersion.patch,
+          zlsVersion.commitHeight ?? null,
+          zlsVersion.isRelease,
+          JSON.stringify(sample),
+        );
+      });
+      await env.ZIGTOOLS_DB.batch(statements);
     });
 
     test("search without version", async () => {
