@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { Env } from "./env";
-import { SemanticVersion } from "./semantic-version";
+import { Order, SemanticVersion } from "./semantic-version";
 import { D2JsonData, ReleaseArtifact } from "./shared";
 
 /**
@@ -153,20 +153,20 @@ function isVersionEnclosedInFailure(
   // fast path: if the `version` is oldest or equal to the oldest tested version
   const oldestTestedVersion = testedVersions[0];
   switch (SemanticVersion.order(version, oldestTestedVersion.version)) {
-    case -1:
-    case 0:
+    case Order.lt:
+    case Order.eq:
       return !oldestTestedVersion.isSuccess;
-    case 1:
+    case Order.gt:
       break;
   }
 
   // fast path: if the `version` is newer or equal to the latest tested version
   const newestTestedVersion = testedVersions[testedVersions.length - 1];
   switch (SemanticVersion.order(version, newestTestedVersion.version)) {
-    case -1:
+    case Order.lt:
       break;
-    case 0:
-    case 1:
+    case Order.eq:
+    case Order.gt:
       return !newestTestedVersion.isSuccess;
   }
 
@@ -177,12 +177,12 @@ function isVersionEnclosedInFailure(
     const mid: number = Math.floor((start + end) / 2);
 
     switch (SemanticVersion.order(testedVersions[mid].version, version)) {
-      case -1:
+      case Order.lt:
         start = mid + 1;
         break;
-      case 0:
+      case Order.eq:
         return !testedVersions[mid].isSuccess;
-      case 1:
+      case Order.gt:
         end = mid - 1;
         break;
     }
@@ -228,7 +228,7 @@ async function selectOnDevelopmentBuild(
 
   if (
     SemanticVersion.order(zigVersion, oldestReleaseMinimumRuntimeZigVersion) ==
-    -1
+    Order.lt
   ) {
     return null;
   }
@@ -246,11 +246,11 @@ async function selectOnDevelopmentBuild(
     assert(data.artifacts.length !== 0);
 
     switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
-      case -1:
+      case Order.lt:
         // the minimum build version may not be monotonically increasing (i.e a newer release has lower minimum build version) so keep searching
         continue;
-      case 0:
-      case 1:
+      case Order.eq:
+      case Order.gt:
         selectedEntry = data;
         break;
     }

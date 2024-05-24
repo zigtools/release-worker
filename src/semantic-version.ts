@@ -1,5 +1,11 @@
 import assert from "node:assert";
 
+export enum Order {
+  lt = -1,
+  eq = 0,
+  gt = 1,
+}
+
 export class SemanticVersion {
   major!: number;
   minor!: number;
@@ -41,25 +47,25 @@ export class SemanticVersion {
     return semver;
   }
 
-  public static order(lhs: SemanticVersion, rhs: SemanticVersion): -1 | 0 | 1 {
-    if (lhs.major < rhs.major) return -1;
-    if (lhs.major > rhs.major) return 1;
+  public static order(lhs: SemanticVersion, rhs: SemanticVersion): Order {
+    if (lhs.major < rhs.major) return Order.lt;
+    if (lhs.major > rhs.major) return Order.gt;
 
-    if (lhs.minor < rhs.minor) return -1;
-    if (lhs.minor > rhs.minor) return 1;
+    if (lhs.minor < rhs.minor) return Order.lt;
+    if (lhs.minor > rhs.minor) return Order.gt;
 
-    if (lhs.patch < rhs.patch) return -1;
-    if (lhs.patch > rhs.patch) return 1;
+    if (lhs.patch < rhs.patch) return Order.lt;
+    if (lhs.patch > rhs.patch) return Order.gt;
 
     if (lhs.commitHeight === undefined && rhs.commitHeight === undefined)
-      return 0;
-    if (lhs.commitHeight === undefined) return 1;
-    if (rhs.commitHeight === undefined) return -1;
+      return Order.eq;
+    if (lhs.commitHeight === undefined) return Order.gt;
+    if (rhs.commitHeight === undefined) return Order.lt;
 
-    if (lhs.commitHeight < rhs.commitHeight) return -1;
-    if (lhs.commitHeight > rhs.commitHeight) return 1;
+    if (lhs.commitHeight < rhs.commitHeight) return Order.lt;
+    if (lhs.commitHeight > rhs.commitHeight) return Order.gt;
 
-    return 0;
+    return Order.eq;
   }
 
   public toString(): string {

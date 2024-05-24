@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
 import assert from "node:assert";
-import { SemanticVersion } from "../src/semantic-version";
+import { Order, SemanticVersion } from "../src/semantic-version";
 
 test.each<string>([
   "",
@@ -63,16 +63,16 @@ test.each<[string, "<" | "=" | ">", string]>([
   assert(rhsVersion !== null);
 
   const actualOrder = SemanticVersion.order(lhsVersion, rhsVersion);
-  let expectedOrder: 1 | 0 | -1;
+  let expectedOrder: Order;
   switch (order) {
     case "<":
-      expectedOrder = -1;
+      expectedOrder = Order.lt;
       break;
     case "=":
-      expectedOrder = 0;
+      expectedOrder = Order.eq;
       break;
     case ">":
-      expectedOrder = 1;
+      expectedOrder = Order.gt;
       break;
   }
   expect(actualOrder).toBe(expectedOrder);
