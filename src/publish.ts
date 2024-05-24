@@ -151,15 +151,9 @@ export async function handlePublish(
   try {
     form = await request.formData();
   } catch (e) {
-    if (e instanceof Error) {
-      return new Response(e.message, {
-        status: 400, // Bad Request
-      });
-    } else {
-      return new Response(null, {
-        status: 400, // Bad Request
-      });
-    }
+    return new Response((e as Error).message, {
+      status: 400, // Bad Request
+    });
   }
 
   /** the return type of the `entries` function is not correct because it doesn't include `File` */

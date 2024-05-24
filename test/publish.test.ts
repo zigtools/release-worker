@@ -82,6 +82,24 @@ describe("/v1/publish", () => {
     expect(response.status).toBe(405);
   });
 
+  test.each<unknown>([null, "", {}, []])(
+    "check for invalid API_TOKEN: %j",
+    async (value) => {
+      const response = await handlePublish(
+        new Request("https://example.com/v1/publish", {
+          method: "POST",
+        }),
+        {
+          API_TOKEN: value as string,
+          R2_PUBLIC_URL: env.R2_PUBLIC_URL,
+          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
+          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
+        },
+      );
+      expect(response.status).toBe(500);
+    },
+  );
+
   describe("check authorization", () => {
     test("missing Authorization header", async () => {
       const response = await SELF.fetch("https://example.com/v1/publish", {
@@ -118,6 +136,20 @@ describe("/v1/publish", () => {
         "Expected 'Basic' authentication scheme!",
       );
       expect(response.status).toBe(400);
+    });
+
+    test("invalid Basic Authorization header", async () => {
+      const response = await SELF.fetch("https://example.com/v1/publish", {
+        body: null,
+        method: "POST",
+        headers: {
+          Authorization: "Basic :",
+        },
+      });
+      expect(await response.text()).toContain(
+        "Unexpected Authorization header",
+      );
+      expect(response.status).toBe(401);
     });
 
     test("wrong username", async () => {
@@ -328,6 +360,7 @@ describe("/v1/publish", () => {
       ["zls-linux-x86_64-0.1.0.gz", "bad"], // .gz extension not allowed
       ["zls-linux-x86_64-0.1.0.tar.gz", "bad"], // .tar.gz extension not allowed
       ["zls-linux-x86_64-0.2.0.tar.xz", "bad"], // mismatching ZLS version
+      ["zls-linux-x86_64-0.1.0-dev.tar.xz", "bad"], // invalid ZLS version
       ["zls-linux-x86_64-0.1.0.tar.xz", "ok"],
       ["zls-windows-aarch64-0.1.0.zip", "ok"],
     ])("validate artifact string: %j -> %s", async (body, expected) => {

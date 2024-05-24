@@ -161,6 +161,22 @@ describe("/v1/select-zls-version", () => {
     expect(response.status).toBe(405);
   });
 
+  test.each<unknown>([null, "", {}, []])(
+    "check for invalid R2_PUBLIC_URL: %j",
+    async (value) => {
+      const response = await handleSelectZLSVersion(
+        new Request("https://example.com/v1/select-zls-version"),
+        {
+          API_TOKEN: env.API_TOKEN,
+          R2_PUBLIC_URL: value as string,
+          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
+          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
+        },
+      );
+      expect(response.status).toBe(500);
+    },
+  );
+
   test("invalid zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version?zig_version=foo",
@@ -299,6 +315,7 @@ describe("/v1/select-zls-version", () => {
     });
 
     test.each<[string, string | null]>([
+      ["0.7.0-dev.5+aaaaaaaaa", null],
       ["0.9.0-dev.10+aaaaaaaaa", null],
       ["0.9.0-dev.15+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
       ["0.9.0-dev.20+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],

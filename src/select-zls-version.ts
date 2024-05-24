@@ -190,11 +190,15 @@ function isVersionEnclosedInFailure(
 
   [start, end] = [end, start];
 
-  if (start < 0 || testedVersions.length <= start)
-    return !testedVersions[end].isSuccess;
-  if (end < 0 || testedVersions.length <= end)
-    return !testedVersions[start].isSuccess;
+  // Not necessary because of the fast-path.
+  //
+  // if (start < 0 || testedVersions.length <= start)
+  //   return !testedVersions[end].isSuccess;
+  // if (end < 0 || testedVersions.length <= end)
+  //   return !testedVersions[start].isSuccess;
 
+  assert(0 <= start && start < testedVersions.length);
+  assert(0 <= end && end < testedVersions.length);
   const startIsSuccess = testedVersions[start].isSuccess;
   const endIsSuccess = testedVersions[end].isSuccess;
 

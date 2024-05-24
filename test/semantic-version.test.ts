@@ -33,6 +33,15 @@ test.each<string>([
 ])("valid %s", (versionString) => {
   const version = SemanticVersion.parse(versionString);
   expect(version).toBeTruthy();
+  assert(version !== null);
+  expect(version.toString()).toBe(versionString);
+});
+
+test("toString", () => {
+  const version = SemanticVersion.parse("0.0.0-dev.1+aaaaaaaaa");
+  expect(Object.prototype.toString.call(version)).toBe(
+    "[object 0.0.0-dev.1+aaaaaaaaa]",
+  );
 });
 
 test.each<[string, "<" | "=" | ">", string]>([
