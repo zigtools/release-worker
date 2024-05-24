@@ -456,6 +456,7 @@ describe("/v1/publish", () => {
       zigVersion: "0.1.1",
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
+      minisign: false,
       testedZigVersion: {
         "0.1.1": true,
       },
@@ -542,6 +543,7 @@ describe("/v1/publish", () => {
       zigVersion: "0.1.1",
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
+      minisign: true,
       testedZigVersion: {
         "0.1.1": true,
       },
@@ -758,6 +760,7 @@ describe("/v1/publish", () => {
       zigVersion: "0.1.1",
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
+      minisign: false,
       testedZigVersion: {
         "0.1.1": true,
         "0.1.2": true,
@@ -835,6 +838,7 @@ describe("/v1/publish", () => {
       zigVersion: "0.11.0",
       minimumBuildZigVersion: "0.11.0",
       minimumRuntimeZigVersion: "0.11.0",
+      minisign: false,
       testedZigVersion: {
         "0.11.0": true,
         "0.11.1": true,

@@ -379,6 +379,7 @@ export async function handlePublish(
     zigVersion: zigVersionString,
     minimumBuildZigVersion: minBuildZigVersionString,
     minimumRuntimeZigVersion: minRuntimeZigVersionString,
+    minisign: Object.keys(artifact_minisigns).length !== 0,
     testedZigVersion: {},
   };
 

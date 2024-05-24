@@ -13,6 +13,7 @@ export interface D2JsonData {
   zigVersion: string;
   minimumBuildZigVersion: string;
   minimumRuntimeZigVersion: string;
+  minisign: boolean;
   /** Always contains the `zigVersion` */
   testedZigVersion: Record<string, boolean>;
   artifacts: ReleaseArtifact[];
