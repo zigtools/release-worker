@@ -23,8 +23,8 @@ export interface ReleaseArtifact {
   version: string;
   extension: "tar.xz" | "zip";
   /** sha256 in hex */
-  file_shasum: string;
-  file_size: number;
+  fileShasum: string;
+  fileSize: number;
 }
 
 export interface SQLiteQueryPlanRow {

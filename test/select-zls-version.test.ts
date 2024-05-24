@@ -9,22 +9,22 @@ import {
 } from "../src/select-zls-version";
 import { SemanticVersion } from "../src/semantic-version";
 
-const default_artifacts: ReleaseArtifact[] = [
+const defaultArtifacts: ReleaseArtifact[] = [
   {
     arch: "x86_64",
     os: "linux",
     version: "0.11.0",
     extension: "tar.xz",
-    file_shasum: "aaa",
-    file_size: 12,
+    fileShasum: "aaa",
+    fileSize: 12,
   },
   {
     arch: "aarch64",
     os: "windows",
     version: "0.11.0",
     extension: "zip",
-    file_shasum: "bbb",
-    file_size: 12,
+    fileShasum: "bbb",
+    fileSize: 12,
   },
 ];
 
@@ -36,7 +36,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.9.0-dev.25+aaaaaaaaa",
     minimumRuntimeZigVersion: "0.9.0-dev.15+aaaaaaaaa",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: {
       "0.9.0-dev.20+aaaaaaaaa": true,
       "0.9.0-dev.25+aaaaaaaaa": true,
@@ -49,7 +49,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.11.0",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: { "0.11.0": true },
   },
   {
@@ -59,7 +59,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.11.0",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: {
       "0.11.0": true,
       "0.12.0-dev.2+aaaaaaaaa": true,
@@ -75,7 +75,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.12.0-dev.7+aaaaaaaaa",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: {
       "0.12.0-dev.7+aaaaaaaaa": true,
       "0.12.0-dev.8+aaaaaaaaa": true,
@@ -90,7 +90,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.12.0-dev.14+aaaaaaaaa",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: {
       "0.12.0-dev.17+aaaaaaaaa": true,
     },
@@ -102,7 +102,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.12.0",
     minimumRuntimeZigVersion: "0.12.0",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: { "0.12.0": true, "0.12.1": true, "0.12.2": true },
   },
   {
@@ -112,7 +112,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.12.0",
     minimumRuntimeZigVersion: "0.12.0",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: { "0.12.0": true },
   },
   {
@@ -122,7 +122,7 @@ const samples: D2JsonData[] = [
     minimumBuildZigVersion: "0.13.0",
     minimumRuntimeZigVersion: "0.13.0",
     minisign: false,
-    artifacts: default_artifacts,
+    artifacts: defaultArtifacts,
     testedZigVersion: {
       "0.13.0": true,
       "0.14.0-dev.2+aaaaaaaaa": true,

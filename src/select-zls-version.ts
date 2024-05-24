@@ -37,8 +37,8 @@ function artifactsToRecord(
   for (const artifact of artifacts) {
     targets[`${artifact.arch}-${artifact.os}`] = {
       tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
-      shasum: artifact.file_shasum,
-      size: artifact.file_size.toString(),
+      shasum: artifact.fileShasum,
+      size: artifact.fileSize.toString(),
     };
   }
   return targets;

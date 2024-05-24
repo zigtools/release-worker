@@ -209,8 +209,8 @@ export async function handlePublish(
 
   const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|zip)$/;
   const artifacts: ReleaseArtifact[] = [];
-  const artifact_files: File[] = [];
-  const artifact_minisigns: Record<string, File | undefined> = {};
+  const artifactFiles: File[] = [];
+  const artifactMinisigns: Record<string, File | undefined> = {};
 
   for (const [key, file] of formEntries) {
     if (key === "zig-version") continue;
@@ -240,8 +240,8 @@ export async function handlePublish(
     }
 
     if (key.endsWith(".minisign")) {
-      assert(!artifact_minisigns[key]); // keys are unique
-      artifact_minisigns[key] = file;
+      assert(!artifactMinisigns[key]); // keys are unique
+      artifactMinisigns[key] = file;
       continue;
     }
 
@@ -273,8 +273,8 @@ export async function handlePublish(
       );
     }
 
-    const file_hash = createHash("sha256");
-    await pipeline(file.stream(), file_hash);
+    const fileHash = createHash("sha256");
+    await pipeline(file.stream(), fileHash);
 
     let expectedMagicNumber: Buffer;
     switch (extension) {
@@ -299,23 +299,23 @@ export async function handlePublish(
       );
     }
 
-    artifact_files.push(file);
+    artifactFiles.push(file);
 
     artifacts.push({
       os: os,
       arch: arch,
       version: version,
       extension: extension,
-      file_shasum: file_hash.digest("hex"),
-      file_size: file.size,
+      fileShasum: fileHash.digest("hex"),
+      fileSize: file.size,
     });
   }
-  assert(artifacts.length == artifact_files.length);
+  assert(artifacts.length == artifactFiles.length);
 
-  const artifact_has_minisign = Array<boolean>(artifacts.length).fill(false);
+  const artifactHasMinisign = Array<boolean>(artifacts.length).fill(false);
 
-  for (const minisignFileName of Object.keys(artifact_minisigns)) {
-    const artifactIndex = artifact_files.findIndex(
+  for (const minisignFileName of Object.keys(artifactMinisigns)) {
+    const artifactIndex = artifactFiles.findIndex(
       (file) => `${file.name}.minisign` == minisignFileName,
     );
     if (artifactIndex === -1) {
@@ -326,13 +326,13 @@ export async function handlePublish(
         },
       );
     }
-    assert(!artifact_has_minisign[artifactIndex]); // keys are unique
-    artifact_has_minisign[artifactIndex] = true;
+    assert(!artifactHasMinisign[artifactIndex]); // keys are unique
+    artifactHasMinisign[artifactIndex] = true;
   }
 
   if (
-    artifact_has_minisign.length !== 0 &&
-    !artifact_has_minisign.every((value) => value === artifact_has_minisign[0])
+    artifactHasMinisign.length !== 0 &&
+    !artifactHasMinisign.every((value) => value === artifactHasMinisign[0])
   ) {
     return new Response(
       `Either, every artifact has a minisign file, or none!`,
@@ -373,7 +373,7 @@ export async function handlePublish(
     zigVersion: zigVersionString,
     minimumBuildZigVersion: minBuildZigVersionString,
     minimumRuntimeZigVersion: minRuntimeZigVersionString,
-    minisign: Object.keys(artifact_minisigns).length !== 0,
+    minisign: Object.keys(artifactMinisigns).length !== 0,
     testedZigVersion: {},
   };
 
@@ -444,15 +444,15 @@ export async function handlePublish(
 
   for (let i = 0; i < artifacts.length; i++) {
     const artifact = artifacts[i];
-    const file = artifact_files[i];
-    const minisignFile = artifact_minisigns[`${file.name}.minisign`];
+    const file = artifactFiles[i];
+    const minisignFile = artifactMinisigns[`${file.name}.minisign`];
 
     promises.push(
       env.ZIGTOOLS_BUILDS.put(file.name, file, {
         httpMetadata: {
           cacheControl: "max-age=31536000",
         },
-        sha256: artifact.file_shasum,
+        sha256: artifact.fileShasum,
       }),
     );
 

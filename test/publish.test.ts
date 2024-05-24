@@ -510,22 +510,22 @@ describe("/v1/publish", () => {
           os: "linux",
           version: "0.1.0",
           extension: "tar.xz",
-          file_shasum: createHash("sha256")
+          fileShasum: createHash("sha256")
             .update(xzMagicNumber)
             .update("binary1")
             .digest("hex"),
-          file_size: xzMagicNumber.length + 7,
+          fileSize: xzMagicNumber.length + 7,
         },
         {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0",
           extension: "zip",
-          file_shasum: createHash("sha256")
+          fileShasum: createHash("sha256")
             .update(zipMagicNumber)
             .update("binary2")
             .digest("hex"),
-          file_size: zipMagicNumber.length + 7,
+          fileSize: zipMagicNumber.length + 7,
         },
       ],
     });
@@ -597,11 +597,11 @@ describe("/v1/publish", () => {
           os: "linux",
           version: "0.1.0",
           extension: "tar.xz",
-          file_shasum: createHash("sha256")
+          fileShasum: createHash("sha256")
             .update(xzMagicNumber)
             .update("binary1")
             .digest("hex"),
-          file_size: xzMagicNumber.length + 7,
+          fileSize: xzMagicNumber.length + 7,
         },
       ],
     });
@@ -816,22 +816,22 @@ describe("/v1/publish", () => {
           os: "linux",
           version: "0.1.0-dev.1+aaaaaaa",
           extension: "tar.xz",
-          file_shasum: createHash("sha256")
+          fileShasum: createHash("sha256")
             .update(xzMagicNumber)
             .update("binary1")
             .digest("hex"),
-          file_size: xzMagicNumber.byteLength + 7,
+          fileSize: xzMagicNumber.byteLength + 7,
         },
         {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0-dev.1+aaaaaaa",
           extension: "zip",
-          file_shasum: createHash("sha256")
+          fileShasum: createHash("sha256")
             .update(zipMagicNumber)
             .update("binary2")
             .digest("hex"),
-          file_size: zipMagicNumber.byteLength + 7,
+          fileSize: zipMagicNumber.byteLength + 7,
         },
       ],
     });
@@ -893,11 +893,11 @@ describe("/v1/publish", () => {
           os: "linux",
           version: "0.11.0",
           extension: "tar.xz",
-          file_shasum: createHash("sha256")
+          fileShasum: createHash("sha256")
             .update(xzMagicNumber)
             .update("binary1")
             .digest("hex"),
-          file_size: xzMagicNumber.byteLength + 7,
+          fileSize: xzMagicNumber.byteLength + 7,
         },
       ],
     });
