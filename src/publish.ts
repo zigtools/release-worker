@@ -299,6 +299,15 @@ export async function handlePublish(
       );
     }
 
+    if (extension === "zip" && os !== "windows") {
+      return new Response(
+        `artifact '${key}' is a .zip file but the operating system is '${os}' instead of 'windows'!`,
+        {
+          status: 400, // Bad Request
+        },
+      );
+    }
+
     artifactFiles.push(file);
 
     artifacts.push({

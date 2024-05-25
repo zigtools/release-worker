@@ -278,7 +278,7 @@ describe("/v1/publish", () => {
         const fileName =
           extension == "xz"
             ? "zls-linux-x86_64-0.1.0.tar.xz"
-            : "zls-x86_64-windows-0.1.0.zip";
+            : "zls-windows-x86_64-0.1.0.zip";
         const response = await sendPublish({
           zlsVersion: "0.1.0",
           zigVersion: "0.1.0",
@@ -420,6 +420,20 @@ describe("/v1/publish", () => {
       });
       expect(await response.text()).toBe(
         "ZLS version is '0.1.0' but all artifacts have the version '0.2.0'",
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test("validate that zip artifact is on windows", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [
+          ["zls-linux-x86_64-0.2.0.zip", new Blob([zipMagicNumber, "binary1"])],
+        ],
+      });
+      expect(await response.text()).toBe(
+        "artifact 'zls-linux-x86_64-0.2.0.zip' is a .zip file but the operating system is 'linux' instead of 'windows'!",
       );
       expect(response.status).toBe(400);
     });
