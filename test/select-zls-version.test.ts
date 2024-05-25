@@ -317,6 +317,8 @@ describe("/v1/select-zls-version", () => {
     });
 
     test.each<[string, string | null]>([
+      ["0.0.0", null],
+      ["0.0.0-dev.1+aaaaaaaaa", null],
       ["0.7.0-dev.5+aaaaaaaaa", null],
       ["0.9.0-dev.10+aaaaaaaaa", null],
       ["0.9.0-dev.15+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
@@ -345,6 +347,7 @@ describe("/v1/select-zls-version", () => {
       ["0.12.0-dev.18+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
       ["0.12.0", "0.12.1"],
       ["0.12.1", "0.12.1"],
+      ["0.13.0-dev.1+aaaaaaaaa", "0.12.1"],
       ["0.13.0", "0.13.0"],
       ["0.14.0", null],
       ["0.15.0", null],
@@ -397,6 +400,24 @@ describe("/v1/select-zls-version", () => {
   });
 
   test("explain query plan when searching on tagged release", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2",
+    )
+      .bind(0, 12)
+      .all<SQLiteQueryPlanRow>();
+
+    // TODO test `response.meta.rows_read` on an example database
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=? AND ZLSVersionMajor=? AND ZLSVersionMinor=?)",
+      },
+    ]);
+  });
+
+  test("explain query plan when searching on tagged release (sorted)", async () => {
     const response = await env.ZIGTOOLS_DB.prepare(
       "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionPatch DESC",
     )

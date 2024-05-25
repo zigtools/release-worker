@@ -135,7 +135,7 @@ async function selectOnTaggedRelease(
 ): Promise<D2JsonData | { error: string }> {
   assert(zigVersion.isRelease);
 
-  // update the "explain query plan when searching on tagged release" test when modifying the query
+  // update the "explain query plan when searching on tagged release (sorted)" test when modifying the query
   const selectedRelease = await env.ZIGTOOLS_DB.prepare(
     "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionPatch DESC",
   )
@@ -222,20 +222,29 @@ async function selectOnDevelopmentBuild(
 ): Promise<D2JsonData | { error: string }> {
   assert(!zigVersion.isRelease);
 
-  // update the "explain query plan when searching on development built" test when modifying the query
-  const releases = await env.ZIGTOOLS_DB.prepare(
-    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
-  )
-    .bind(zigVersion.major, zigVersion.minor)
-    .all<{ JsonData: string }>();
+  const [developmentReleases, taggedReleases] = await env.ZIGTOOLS_DB.batch<{
+    JsonData: string;
+  }>([
+    // update the "explain query plan when searching on development built" test when modifying the query
+    env.ZIGTOOLS_DB.prepare(
+      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
+    ).bind(zigVersion.major, zigVersion.minor),
+    // update the "explain query plan when searching on tagged release" test when modifying the query
+    env.ZIGTOOLS_DB.prepare(
+      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2",
+    ).bind(zigVersion.major, zigVersion.minor - 1),
+  ]);
 
-  if (releases.results.length === 0) {
+  // tagged releases come first so that development builts come first
+  const releases = taggedReleases.results.concat(developmentReleases.results);
+
+  if (releases.length === 0) {
     return {
       error: `No builds for the ${zigVersion.major.toString()}.${zigVersion.minor.toString()} release cycle are available`,
     };
   }
 
-  const oldestRelease = releases.results[0];
+  const oldestRelease = releases[0];
   const oldestReleaseData = JSON.parse(oldestRelease.JsonData) as D2JsonData;
   const oldestReleaseMinimumRuntimeZigVersion = SemanticVersion.parse(
     oldestReleaseData.minimumRuntimeZigVersion,
@@ -255,7 +264,7 @@ async function selectOnDevelopmentBuild(
 
   let selectedEntry: D2JsonData = oldestReleaseData;
 
-  for (const entry of releases.results) {
+  for (const entry of releases) {
     const data = JSON.parse(entry.JsonData) as D2JsonData;
     const minimumRuntimeZigVersion = SemanticVersion.parse(
       data.minimumRuntimeZigVersion,
