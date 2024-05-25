@@ -17,6 +17,10 @@ test.each<string>([
   "1.0.0-dev.1-aaaaaaaaa",
   "1.0.0-dev.1+aaaaa",
   "1.0.0-dev.1+aaaaaaaaaaaaa",
+  "99999999999999999999999999999999.0.0",
+  "1.99999999999999999999999999999999.0",
+  "1.0.99999999999999999999999999999999",
+  "1.0.0-dev.99999999999999999999999999999999+aaaaaaaaa",
 ])("invalid %s? -> %j", (versionString) => {
   const version = SemanticVersion.parse(versionString);
   expect(version).toBeNull();

@@ -26,12 +26,15 @@ export class SemanticVersion {
 
     const semver = new SemanticVersion();
     semver.major = parseInt(match[1]);
+    if (semver.major > Number.MAX_SAFE_INTEGER) return null;
     assert(!isNaN(semver.major));
 
     semver.minor = parseInt(match[2]);
+    if (semver.minor > Number.MAX_SAFE_INTEGER) return null;
     assert(!isNaN(semver.minor));
 
     semver.patch = parseInt(match[3]);
+    if (semver.patch > Number.MAX_SAFE_INTEGER) return null;
     assert(!isNaN(semver.patch));
 
     assert(!match[4] == !match[5]);
@@ -40,6 +43,7 @@ export class SemanticVersion {
     if (!match[4]) return semver;
 
     semver.commitHeight = parseInt(match[4]);
+    if (semver.commitHeight > Number.MAX_SAFE_INTEGER) return null;
     assert(!isNaN(semver.commitHeight));
 
     semver.commitID = match[5];
