@@ -474,6 +474,17 @@ describe("/v1/publish", () => {
     }
   });
 
+  test("try to publish ZLS 1.0.0", async () => {
+    const response = await sendPublish({
+      zlsVersion: "1.0.0",
+      zigVersion: "1.0.0",
+      artifacts: [
+        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
+      ],
+    });
+    expect(response.status).toBe(418);
+  });
+
   test("publish new successfull build", async () => {
     const date = Date.now();
     vi.setSystemTime(date);

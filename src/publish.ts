@@ -348,6 +348,12 @@ export async function handlePublish(
     });
   }
 
+  if (zlsVersion.major !== 0) {
+    return new Response(`WHAT?!?!?!?!`, {
+      status: 418, // I'm a teapot
+    });
+  }
+
   if (
     artifacts.length !== 0 &&
     !artifacts.every((artifact) => artifact.version === artifacts[0].version)
