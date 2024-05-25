@@ -25,8 +25,8 @@ curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.13.0-dev
 ```
 
 ```bash
-curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=1.0.0"
->>> null
+curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.30.0"
+>>> {"error":"ZLS 0.30.* does not exist!"}
 ```
 
 ## /v1/select-zls-version

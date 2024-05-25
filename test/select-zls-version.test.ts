@@ -133,7 +133,7 @@ const samples: D2JsonData[] = [
 
 async function selectZLSVersion(
   zigVersion: string,
-): Promise<SelectZLSVersionWithVersionResponse | null> {
+): Promise<SelectZLSVersionWithVersionResponse> {
   const url = new URL("https://example.com/v1/select-zls-version");
   url.searchParams.set("zig_version", zigVersion);
 
@@ -199,7 +199,9 @@ describe("/v1/select-zls-version", () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version?zig_version=0.11.0",
     );
-    expect(await response.json()).toBe(null);
+    expect(await response.json()).toStrictEqual({
+      error: "ZLS 0.11.* does not exist!",
+    });
     expect(response.status).toBe(200);
   });
 
@@ -316,6 +318,7 @@ describe("/v1/select-zls-version", () => {
 
     test.each<[string, string | null]>([
       ["0.7.0-dev.5+aaaaaaaaa", null],
+      ["0.9.0", null],
       ["0.9.0-dev.10+aaaaaaaaa", null],
       ["0.9.0-dev.15+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
       ["0.9.0-dev.20+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
@@ -347,7 +350,33 @@ describe("/v1/select-zls-version", () => {
       ["0.15.0", null],
     ])("Zig %s -> ZLS %s", async (zigVersion, expectedZLSVersion) => {
       const response = await selectZLSVersion(zigVersion);
-      expect(response?.version ?? null).toBe(expectedZLSVersion);
+      if (expectedZLSVersion === null) {
+        expect(response).toHaveProperty("error");
+      } else {
+        expect(response).not.toHaveProperty("error");
+        assert(!("error" in response));
+        expect(response.version).toBe<string>(expectedZLSVersion);
+      }
+    });
+
+    test.each<[string, string]>([
+      ["0.10.0", "ZLS 0.10.* does not exist!"],
+      ["0.10.1", "ZLS 0.10.* does not exist!"],
+      ["0.15.0", "ZLS 0.15.* does not exist!"],
+      ["0.10.0", "ZLS 0.10.* does not exist!"],
+      [
+        "0.10.0-dev.5+aaaaaaaaa",
+        "No builds for the 0.10 release cycle are available",
+      ],
+      [
+        "0.9.0-dev.10+aaaaaaaaa",
+        "Zig 0.9.0-dev.10+aaaaaaaaa is not supported by ZLS",
+      ],
+    ])("Zig %s -> %s", async (zigVersion, expectedError) => {
+      const response = await selectZLSVersion(zigVersion);
+      expect(response).toStrictEqual({
+        error: expectedError,
+      });
     });
   });
 
