@@ -426,7 +426,18 @@ export async function handlePublish(
     }
   }
 
-  if (!zlsVersion.isRelease && zlsVersion.commitHeight !== undefined) {
+  let skipArtifactUpload;
+
+  if (zlsVersion.isRelease) {
+    const result = await env.ZIGTOOLS_DB.prepare(
+      "SELECT ZLSVersion FROM ZLSReleases WHERE ZLSVersion = ?1",
+    )
+      .bind(zlsVersionString)
+      .first<{ ZLSVersion: string }>();
+
+    skipArtifactUpload = result !== null;
+  } else {
+    assert(zlsVersion.commitHeight !== undefined);
     const result = await env.ZIGTOOLS_DB.prepare(
       "SELECT ZLSVersion FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 AND ZLSVersionPatch = ?3 AND ZLSVersionBuildID = ?4",
     )
@@ -437,6 +448,8 @@ export async function handlePublish(
         zlsVersion.commitHeight,
       )
       .first<{ ZLSVersion: string }>();
+
+    skipArtifactUpload = result !== null;
 
     if (result !== null && zlsVersionString !== result.ZLSVersion) {
       return new Response(
@@ -472,6 +485,8 @@ export async function handlePublish(
     ),
   ]);
 
+  if (skipArtifactUpload) return new Response();
+
   const promises: Promise<R2Object>[] = [];
 
   for (let i = 0; i < artifacts.length; i++) {
@@ -501,7 +516,5 @@ export async function handlePublish(
 
   await Promise.all(promises);
 
-  return new Response(undefined, {
-    status: 200, // Ok
-  });
+  return new Response();
 }

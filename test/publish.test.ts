@@ -1059,7 +1059,7 @@ describe("/v1/publish", () => {
           ],
           [
             "zls-linux-x86_64-0.11.0.tar.gz",
-            new Blob([gzipMagicNumber, "binary1"]),
+            new Blob([gzipMagicNumber, "binary2"]),
           ],
         ],
       });
@@ -1074,15 +1074,15 @@ describe("/v1/publish", () => {
         artifacts: [
           [
             "zls-linux-x86_64-0.11.0.tar.xz",
-            new Blob([xzMagicNumber, "binary2"]),
+            new Blob([xzMagicNumber, "binary3"]),
           ],
           [
             "zls-linux-x86_64-0.11.0.tar.gz",
-            new Blob([gzipMagicNumber, "binary2"]),
+            new Blob([gzipMagicNumber, "binary4"]),
           ],
           [
             "zls-windows-aarch64-0.11.0.zip",
-            new Blob([zipMagicNumber, "binary2"]),
+            new Blob([zipMagicNumber, "binary5"]),
           ],
         ],
       });
@@ -1121,11 +1121,44 @@ describe("/v1/publish", () => {
           extension: "tar.gz",
           fileShasum: createHash("sha256")
             .update(gzipMagicNumber)
-            .update("binary1")
+            .update("binary2")
             .digest("hex"),
           fileSize: gzipMagicNumber.byteLength + 7,
         },
       ],
     });
+
+    const objects = await env.ZIGTOOLS_BUILDS.list({});
+
+    expect(objects.objects).toMatchObject([
+      {
+        key: "zls-linux-x86_64-0.11.0.tar.gz",
+        size: gzipMagicNumber.length + 7,
+      },
+      {
+        key: "zls-linux-x86_64-0.11.0.tar.xz",
+        size: xzMagicNumber.length + 7,
+      },
+    ]);
+
+    assert(objects.objects[0].checksums.sha256 !== undefined);
+    assert(objects.objects[1].checksums.sha256 !== undefined);
+
+    expect(
+      Buffer.from(objects.objects[0].checksums.sha256).toString("hex"),
+    ).toBe(
+      createHash("sha256")
+        .update(gzipMagicNumber)
+        .update("binary2")
+        .digest("hex"),
+    );
+    expect(
+      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
+    ).toBe(
+      createHash("sha256")
+        .update(xzMagicNumber)
+        .update("binary1")
+        .digest("hex"),
+    );
   });
 });
