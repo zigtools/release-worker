@@ -5,9 +5,9 @@ import { createHash } from "node:crypto";
 import { Env } from "./env";
 import {
   D2JsonData,
+  Extension,
   ReleaseArtifact,
-  xzMagicNumber,
-  zipMagicNumber,
+  getMagicNumberOfExtension,
 } from "./shared";
 import { SemanticVersion } from "./semantic-version";
 
@@ -207,7 +207,7 @@ export async function handlePublish(
     );
   }
 
-  const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|zip)$/;
+  const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|tar\.gz|zip)$/;
   const artifacts: ReleaseArtifact[] = [];
   const artifactFiles: File[] = [];
   const artifactMinisigns: Record<string, File | undefined> = {};
@@ -240,7 +240,7 @@ export async function handlePublish(
     }
 
     if (key.endsWith(".minisign")) {
-      assert(artifactMinisigns[key] === undefined); // keys are unique
+      assert(!(key in artifactMinisigns)); // keys are unique
       artifactMinisigns[key] = file;
       continue;
     }
@@ -256,9 +256,9 @@ export async function handlePublish(
     const os = match[1];
     const arch = match[2];
     const version = match[3];
-    const extension = match[4] as "tar.xz" | "zip";
+    const extension = match[4] as Extension;
 
-    assert(key === `zls-${os}-${arch}-${version}.${extension}`);
+    assert.strictEqual(key, `zls-${os}-${arch}-${version}.${extension}`);
 
     // console.log(
     //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${file_hash.digest("hex")}, size=${value.size.toString()}`,
@@ -276,16 +276,7 @@ export async function handlePublish(
     const fileHash = createHash("sha256");
     await pipeline(file.stream(), fileHash);
 
-    let expectedMagicNumber: Buffer;
-    switch (extension) {
-      case "tar.xz":
-        expectedMagicNumber = xzMagicNumber;
-        break;
-      case "zip":
-        expectedMagicNumber = zipMagicNumber;
-        break;
-    }
-
+    const expectedMagicNumber = getMagicNumberOfExtension(extension);
     const actualMagicNumber: Uint8Array = new Uint8Array(
       await file.slice(0, expectedMagicNumber.byteLength).arrayBuffer(),
     );
@@ -293,15 +284,6 @@ export async function handlePublish(
     if (!expectedMagicNumber.equals(actualMagicNumber)) {
       return new Response(
         `artifact '${key}' should have the magic number ${stringifyMagicNumber(expectedMagicNumber)} but got ${stringifyMagicNumber(actualMagicNumber)}!`,
-        {
-          status: 400, // Bad Request
-        },
-      );
-    }
-
-    if (extension === "zip" && os !== "windows") {
-      return new Response(
-        `artifact '${key}' is a .zip file but the operating system is '${os}' instead of 'windows'!`,
         {
           status: 400, // Bad Request
         },
@@ -320,6 +302,41 @@ export async function handlePublish(
     });
   }
   assert(artifacts.length == artifactFiles.length);
+
+  /** key is is the artifact file name without the extension */
+  const groupedArtifacts: Record<string, ReleaseArtifact[]> = {};
+
+  for (const artifact of artifacts) {
+    const key = `zls-${artifact.os}-${artifact.arch}-${artifact.version}`;
+    if (key in groupedArtifacts) {
+      groupedArtifacts[key].push(artifact);
+    } else {
+      groupedArtifacts[key] = [artifact];
+    }
+  }
+
+  // validate artifact file extensions
+  for (const [basename, items] of Object.entries(groupedArtifacts)) {
+    assert(items.length > 0);
+    const extensions = items.map((artifact) => artifact.extension);
+
+    const expectedExtensions: Extension[] =
+      items[0].os === "windows" ? ["zip"] : ["tar.xz", "tar.gz"];
+
+    if (
+      extensions.length === expectedExtensions.length &&
+      extensions.every((ex) => expectedExtensions.includes(ex)) &&
+      expectedExtensions.every((ex) => extensions.includes(ex))
+    )
+      continue;
+
+    return new Response(
+      `artifact extensions of '${basename}.*' must be ${JSON.stringify(expectedExtensions)} but found ${JSON.stringify(extensions)}!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
 
   const artifactHasMinisign = Array<boolean>(artifacts.length).fill(false);
 

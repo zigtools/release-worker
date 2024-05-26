@@ -4,6 +4,9 @@ import { createHash } from "node:crypto";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
   D2JsonData,
+  Extension,
+  getMagicNumberOfExtension,
+  gzipMagicNumber,
   SQLiteQueryPlanRow,
   xzMagicNumber,
   zipMagicNumber,
@@ -60,9 +63,11 @@ async function sendPublish({
     minimumRuntimeZigVersion ?? zigVersion,
   );
   for (const [fileName, file] of artifacts) {
+    assert(!form.has(fileName));
     form.set(fileName, file, fileName);
     if (withMinisign ?? false) {
       const minisignFileName = `${fileName}.minisign`;
+      assert(!form.has(minisignFileName));
       form.set(
         minisignFileName,
         new Blob([
@@ -73,6 +78,21 @@ async function sendPublish({
     }
   }
   return await sendPublishForm(form);
+}
+
+function getSampleArtifacts(
+  zlsVersion: string,
+): [fileName: string, file: Blob][] {
+  return [
+    [
+      `zls-linux-x86_64-${zlsVersion}.tar.xz`,
+      new Blob([xzMagicNumber, "binary1"]),
+    ],
+    [
+      `zls-linux-x86_64-${zlsVersion}.tar.gz`,
+      new Blob([gzipMagicNumber, "binary2"]),
+    ],
+  ];
 }
 
 describe("/v1/publish", () => {
@@ -199,12 +219,7 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          [
-            `zls-linux-x86_64-0.1.0.tar.xz`,
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifacts("0.1.0"),
       });
 
       expect(response.body).toBe(null);
@@ -220,12 +235,7 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: zlsVersion,
         zigVersion: "0.1.0",
-        artifacts: [
-          [
-            `zls-linux-x86_64-${zlsVersion}.tar.xz`,
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifacts(zlsVersion),
       });
       if (kind === "ok") {
         expect(await response.text()).toBe("");
@@ -247,12 +257,7 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0-dev.1+aaaaaaaaa",
         zigVersion: zigVersion,
-        artifacts: [
-          [
-            `zls-linux-x86_64-0.1.0-dev.1+aaaaaaaaa.tar.xz`,
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifacts("0.1.0-dev.1+aaaaaaaaa"),
       });
       if (expected === "ok") {
         expect(await response.text()).toBe("");
@@ -265,24 +270,52 @@ describe("/v1/publish", () => {
       }
     });
 
-    test.each<["xz" | "zip", Uint8Array, "ok" | "bad"]>([
-      ["xz", new Uint8Array(xzMagicNumber), "ok"],
-      ["xz", new Uint8Array(zipMagicNumber), "bad"],
-      ["xz", new Uint8Array([1, 2, 3, 4]), "bad"],
+    test.each<[Extension, Uint8Array, "ok" | "bad"]>([
+      ["tar.xz", new Uint8Array(xzMagicNumber), "ok"],
+      ["tar.xz", new Uint8Array(gzipMagicNumber), "bad"],
+      ["tar.xz", new Uint8Array(zipMagicNumber), "bad"],
+      ["tar.xz", new Uint8Array([1, 2, 3, 4]), "bad"],
+
+      ["tar.gz", new Uint8Array(gzipMagicNumber), "ok"],
+      ["tar.gz", new Uint8Array(xzMagicNumber), "bad"],
+      ["tar.gz", new Uint8Array(zipMagicNumber), "bad"],
+      ["tar.gz", new Uint8Array([1, 2, 3, 4]), "bad"],
+
       ["zip", new Uint8Array(zipMagicNumber), "ok"],
       ["zip", new Uint8Array(xzMagicNumber), "bad"],
+      ["zip", new Uint8Array(gzipMagicNumber), "bad"],
       ["zip", new Uint8Array([1, 2, 3, 4]), "bad"],
     ])(
       "validate file magic number: %s %s %s",
       async (extension, body, expected) => {
-        const fileName =
-          extension == "xz"
-            ? "zls-linux-x86_64-0.1.0.tar.xz"
-            : "zls-windows-x86_64-0.1.0.zip";
+        let artifacts: [fileName: string, file: Blob][];
+        switch (extension) {
+          case "tar.xz":
+            artifacts = [
+              ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([body])],
+              [
+                "zls-linux-x86_64-0.1.0.tar.gz",
+                new Blob([gzipMagicNumber, "binary1"]),
+              ],
+            ];
+            break;
+          case "tar.gz":
+            artifacts = [
+              [
+                "zls-linux-x86_64-0.1.0.tar.xz",
+                new Blob([xzMagicNumber, "binary1"]),
+              ],
+              ["zls-linux-x86_64-0.1.0.tar.gz", new Blob([body])],
+            ];
+            break;
+          case "zip":
+            artifacts = [["zls-windows-x86_64-0.1.0.zip", new Blob([body])]];
+            break;
+        }
         const response = await sendPublish({
           zlsVersion: "0.1.0",
           zigVersion: "0.1.0",
-          artifacts: [[fileName, new Blob([body])]],
+          artifacts: artifacts,
         });
 
         if (expected === "ok") {
@@ -290,7 +323,7 @@ describe("/v1/publish", () => {
           expect(response.status).toBe(200);
         } else {
           expect(await response.text()).contains(
-            `artifact '${fileName}' should have the magic number`,
+            `should have the magic number`,
           );
           expect(response.status).toBe(400);
         }
@@ -358,24 +391,37 @@ describe("/v1/publish", () => {
       ["some string", "bad"],
       ["x86_64-linux-0.1.0.tar.xz", "bad"], // missing 'zls-' prefix
       ["zls-linux-x86_64-0.1.0.gz", "bad"], // .gz extension not allowed
-      ["zls-linux-x86_64-0.1.0.tar.gz", "bad"], // .tar.gz extension not allowed
+      ["zls-linux-x86_64-0.1.0.tar.zstd", "bad"], // .tar.zstd extension not allowed
       ["zls-linux-x86_64-0.2.0.tar.xz", "bad"], // mismatching ZLS version
       ["zls-linux-x86_64-0.1.0-dev.tar.xz", "bad"], // invalid ZLS version
       ["zls-linux-x86_64-0.1.0.tar.xz", "ok"],
+      ["zls-linux-x86_64-0.1.0.tar.gz", "ok"],
       ["zls-windows-aarch64-0.1.0.zip", "ok"],
-    ])("validate artifact string: %j -> %s", async (body, expected) => {
+    ])("validate artifact string: %j -> %s", async (filename, expected) => {
+      let artifacts: [fileName: string, file: Blob][];
+      if (filename.endsWith("zip")) {
+        artifacts = [[filename, new Blob([zipMagicNumber, "binary1"])]];
+      } else {
+        artifacts = [
+          [
+            filename.endsWith("xz")
+              ? filename
+              : "zls-linux-x86_64-0.1.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+          [
+            filename.endsWith("xz")
+              ? "zls-linux-x86_64-0.1.0.tar.gz"
+              : filename,
+            new Blob([gzipMagicNumber, "binary1"]),
+          ],
+        ];
+      }
+
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          [
-            body,
-            new Blob([
-              body.endsWith(".zip") ? zipMagicNumber : xzMagicNumber,
-              "binary1",
-            ]),
-          ],
-        ],
+        artifacts: artifacts,
       });
 
       if (expected === "ok") {
@@ -396,8 +442,12 @@ describe("/v1/publish", () => {
             new Blob([xzMagicNumber, "binary1"]),
           ],
           [
-            "zls-linux-x86_64-0.2.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
+            "zls-linux-x86_64-0.1.0.tar.gz",
+            new Blob([gzipMagicNumber, "binary2"]),
+          ],
+          [
+            "zls-windows-x86_64-0.2.0.zip",
+            new Blob([zipMagicNumber, "binary3"]),
           ],
         ],
       });
@@ -411,12 +461,7 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.2.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifacts("0.2.0"),
       });
       expect(await response.text()).toBe(
         "ZLS version is '0.1.0' but all artifacts have the version '0.2.0'",
@@ -424,16 +469,102 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate that zip artifact is on windows", async () => {
+    test("validate that zip artifacts are on windows", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
         artifacts: [
-          ["zls-linux-x86_64-0.2.0.zip", new Blob([zipMagicNumber, "binary1"])],
+          ["zls-linux-x86_64-0.1.0.zip", new Blob([zipMagicNumber, "binary1"])],
         ],
       });
       expect(await response.text()).toBe(
-        "artifact 'zls-linux-x86_64-0.2.0.zip' is a .zip file but the operating system is 'linux' instead of 'windows'!",
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip"]!`,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test("validate that non zip artifacts are not on windows", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [
+          [
+            "zls-windows-x86_64-0.1.0.tar.xz",
+            new Blob([xzMagicNumber, "binary1"]),
+          ],
+        ],
+      });
+      expect(await response.text()).toBe(
+        `artifact extensions of 'zls-windows-x86_64-0.1.0.*' must be ["zip"] but found ["tar.xz"]!`,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test.each<[("tar.xz" | "tar.gz" | "zip")[], string]>([
+      [
+        ["tar.xz"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["tar.xz"]!`,
+      ],
+      [
+        ["tar.gz"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["tar.gz"]!`,
+      ],
+      [
+        ["tar.gz", "zip"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["tar.gz","zip"]!`,
+      ],
+      [
+        ["zip", "tar.gz"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip","tar.gz"]!`,
+      ],
+      [
+        ["tar.xz", "zip"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["tar.xz","zip"]!`,
+      ],
+      [
+        ["zip", "tar.xz"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip","tar.xz"]!`,
+      ],
+      [
+        ["tar.xz", "tar.gz", "zip"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["tar.xz","tar.gz","zip"]!`,
+      ],
+      [
+        ["zip", "tar.xz", "tar.gz"],
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip","tar.xz","tar.gz"]!`,
+      ],
+    ])(
+      "validate artifact extensions: %j",
+      async (extensions, expectedError) => {
+        const artifacts: [fileName: string, file: Blob][] = [];
+        for (const extension of extensions) {
+          artifacts.push([
+            `zls-linux-x86_64-0.1.0.${extension}`,
+            new Blob([getMagicNumberOfExtension(extension), "binary1"]),
+          ]);
+        }
+
+        const response = await sendPublish({
+          zlsVersion: "0.1.0",
+          zigVersion: "0.1.0",
+          artifacts: artifacts,
+        });
+
+        expect(await response.text()).toBe(expectedError);
+        expect(response.status).toBe(400);
+      },
+    );
+
+    test("validate that tar.xz and tar.gz are always published together", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: [
+          ["zls-linux-x86_64-0.1.0.zip", new Blob([zipMagicNumber, "binary1"])],
+        ],
+      });
+      expect(await response.text()).toBe(
+        `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip"]!`,
       );
       expect(response.status).toBe(400);
     });
@@ -452,12 +583,7 @@ describe("/v1/publish", () => {
         const response = await sendPublish({
           zlsVersion: zlsVersion,
           zigVersion: zigVersion,
-          artifacts: [
-            [
-              `zls-linux-x86_64-${zlsVersion}.tar.xz`,
-              new Blob([xzMagicNumber, "binary1"]),
-            ],
-          ],
+          artifacts: getSampleArtifacts(zlsVersion),
         });
         if (expected === "ok") {
           expect(await response.text()).toBe("");
@@ -492,9 +618,7 @@ describe("/v1/publish", () => {
     const response = await sendPublish({
       zlsVersion: "1.0.0",
       zigVersion: "1.0.0",
-      artifacts: [
-        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
-      ],
+      artifacts: getSampleArtifacts("1.0.0"),
     });
     expect(response.status).toBe(418);
   });
@@ -509,8 +633,12 @@ describe("/v1/publish", () => {
       artifacts: [
         ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
         [
+          "zls-linux-x86_64-0.1.0.tar.gz",
+          new Blob([gzipMagicNumber, "binary2"]),
+        ],
+        [
           "zls-windows-aarch64-0.1.0.zip",
-          new Blob([zipMagicNumber, "binary2"]),
+          new Blob([zipMagicNumber, "binary3"]),
         ],
       ],
     });
@@ -542,13 +670,24 @@ describe("/v1/publish", () => {
           fileSize: xzMagicNumber.length + 7,
         },
         {
+          arch: "x86_64",
+          os: "linux",
+          version: "0.1.0",
+          extension: "tar.gz",
+          fileShasum: createHash("sha256")
+            .update(gzipMagicNumber)
+            .update("binary2")
+            .digest("hex"),
+          fileSize: gzipMagicNumber.length + 7,
+        },
+        {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0",
           extension: "zip",
           fileShasum: createHash("sha256")
             .update(zipMagicNumber)
-            .update("binary2")
+            .update("binary3")
             .digest("hex"),
           fileSize: zipMagicNumber.length + 7,
         },
@@ -558,6 +697,10 @@ describe("/v1/publish", () => {
     const objects = await env.ZIGTOOLS_BUILDS.list({});
 
     expect(objects.objects).toMatchObject([
+      {
+        key: "zls-linux-x86_64-0.1.0.tar.gz",
+        size: gzipMagicNumber.length + 7,
+      },
       {
         key: "zls-linux-x86_64-0.1.0.tar.xz",
         size: xzMagicNumber.length + 7,
@@ -570,9 +713,18 @@ describe("/v1/publish", () => {
 
     assert(objects.objects[0].checksums.sha256 !== undefined);
     assert(objects.objects[1].checksums.sha256 !== undefined);
+    assert(objects.objects[2].checksums.sha256 !== undefined);
 
     expect(
       Buffer.from(objects.objects[0].checksums.sha256).toString("hex"),
+    ).toBe(
+      createHash("sha256")
+        .update(gzipMagicNumber)
+        .update("binary2")
+        .digest("hex"),
+    );
+    expect(
+      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(xzMagicNumber)
@@ -580,11 +732,11 @@ describe("/v1/publish", () => {
         .digest("hex"),
     );
     expect(
-      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
+      Buffer.from(objects.objects[2].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(zipMagicNumber)
-        .update("binary2")
+        .update("binary3")
         .digest("hex"),
     );
   });
@@ -596,9 +748,7 @@ describe("/v1/publish", () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0",
       zigVersion: "0.1.1",
-      artifacts: [
-        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
-      ],
+      artifacts: getSampleArtifacts("0.1.0"),
       withMinisign: true,
     });
 
@@ -628,12 +778,30 @@ describe("/v1/publish", () => {
             .digest("hex"),
           fileSize: xzMagicNumber.length + 7,
         },
+        {
+          arch: "x86_64",
+          os: "linux",
+          version: "0.1.0",
+          extension: "tar.gz",
+          fileShasum: createHash("sha256")
+            .update(gzipMagicNumber)
+            .update("binary2")
+            .digest("hex"),
+          fileSize: gzipMagicNumber.length + 7,
+        },
       ],
     });
 
     const objects = await env.ZIGTOOLS_BUILDS.list({});
 
     expect(objects.objects).toMatchObject([
+      {
+        key: "zls-linux-x86_64-0.1.0.tar.gz",
+        size: gzipMagicNumber.length + 7,
+      },
+      {
+        key: "zls-linux-x86_64-0.1.0.tar.gz.minisign",
+      },
       {
         key: "zls-linux-x86_64-0.1.0.tar.xz",
         size: xzMagicNumber.length + 7,
@@ -681,6 +849,11 @@ describe("/v1/publish", () => {
         ],
         ["zls-linux-x86_64-0.11.0.tar.xz.minisign", new Blob(["something"])],
         [
+          "zls-linux-x86_64-0.11.0.tar.gz",
+          new Blob([gzipMagicNumber, "binary1"]),
+        ],
+        ["zls-linux-x86_64-0.11.0.tar.gz.minisign", new Blob(["something"])],
+        [
           "zls-windows-aarch64-0.11.0.zip",
           new Blob([zipMagicNumber, "binary2"]),
         ],
@@ -713,12 +886,7 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.13.0-dev.1+aaaaaaa",
         zigVersion: "0.12.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.13.0-dev.1+aaaaaaa.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifacts("0.13.0-dev.1+aaaaaaa"),
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -728,12 +896,7 @@ describe("/v1/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.13.0-dev.1+bbbbbbb",
         zigVersion: "0.12.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.13.0-dev.1+bbbbbbb.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifacts("0.13.0-dev.1+bbbbbbb"),
       });
       expect(await response.text()).toBe(
         "ZLS version is '0.13.0-dev.1+bbbbbbb' can't be published because ZLS '0.13.0-dev.1+aaaaaaa' has already been published!",
@@ -771,8 +934,12 @@ describe("/v1/publish", () => {
             new Blob([xzMagicNumber, "binary1"]),
           ],
           [
+            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.gz",
+            new Blob([gzipMagicNumber, "binary2"]),
+          ],
+          [
             "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip",
-            new Blob([zipMagicNumber, "binary2"]),
+            new Blob([zipMagicNumber, "binary3"]),
           ],
         ],
       });
@@ -799,11 +966,15 @@ describe("/v1/publish", () => {
         artifacts: [
           [
             "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz",
-            new Blob([xzMagicNumber, "binary3"]),
+            new Blob([xzMagicNumber, "binary4"]),
+          ],
+          [
+            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.gz",
+            new Blob([gzipMagicNumber, "binary5"]),
           ],
           [
             "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip",
-            new Blob([zipMagicNumber, "binary4"]),
+            new Blob([zipMagicNumber, "binary6"]),
           ],
         ],
       });
@@ -848,13 +1019,24 @@ describe("/v1/publish", () => {
           fileSize: xzMagicNumber.byteLength + 7,
         },
         {
+          arch: "x86_64",
+          os: "linux",
+          version: "0.1.0-dev.1+aaaaaaa",
+          extension: "tar.gz",
+          fileShasum: createHash("sha256")
+            .update(gzipMagicNumber)
+            .update("binary2")
+            .digest("hex"),
+          fileSize: gzipMagicNumber.byteLength + 7,
+        },
+        {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0-dev.1+aaaaaaa",
           extension: "zip",
           fileShasum: createHash("sha256")
             .update(zipMagicNumber)
-            .update("binary2")
+            .update("binary3")
             .digest("hex"),
           fileSize: zipMagicNumber.byteLength + 7,
         },
@@ -875,6 +1057,10 @@ describe("/v1/publish", () => {
             "zls-linux-x86_64-0.11.0.tar.xz",
             new Blob([xzMagicNumber, "binary1"]),
           ],
+          [
+            "zls-linux-x86_64-0.11.0.tar.gz",
+            new Blob([gzipMagicNumber, "binary1"]),
+          ],
         ],
       });
       expect(await response.text()).toBe("");
@@ -889,6 +1075,10 @@ describe("/v1/publish", () => {
           [
             "zls-linux-x86_64-0.11.0.tar.xz",
             new Blob([xzMagicNumber, "binary2"]),
+          ],
+          [
+            "zls-linux-x86_64-0.11.0.tar.gz",
+            new Blob([gzipMagicNumber, "binary2"]),
           ],
           [
             "zls-windows-aarch64-0.11.0.zip",
@@ -923,6 +1113,17 @@ describe("/v1/publish", () => {
             .update("binary1")
             .digest("hex"),
           fileSize: xzMagicNumber.byteLength + 7,
+        },
+        {
+          arch: "x86_64",
+          os: "linux",
+          version: "0.11.0",
+          extension: "tar.gz",
+          fileShasum: createHash("sha256")
+            .update(gzipMagicNumber)
+            .update("binary1")
+            .digest("hex"),
+          fileSize: gzipMagicNumber.byteLength + 7,
         },
       ],
     });

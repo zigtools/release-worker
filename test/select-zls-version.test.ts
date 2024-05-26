@@ -19,11 +19,19 @@ const defaultArtifacts: ReleaseArtifact[] = [
     fileSize: 12,
   },
   {
+    arch: "x86_64",
+    os: "linux",
+    version: "0.11.0",
+    extension: "tar.gz",
+    fileShasum: "bbb",
+    fileSize: 12,
+  },
+  {
     arch: "aarch64",
     os: "windows",
     version: "0.11.0",
     extension: "zip",
-    fileShasum: "bbb",
+    fileShasum: "ccc",
     fileSize: 12,
   },
 ];
@@ -251,7 +259,7 @@ describe("/v1/select-zls-version", () => {
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "bbb",
+            shasum: "ccc",
             size: "12",
           },
         },
@@ -264,7 +272,7 @@ describe("/v1/select-zls-version", () => {
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "bbb",
+            shasum: "ccc",
             size: "12",
           },
         },
@@ -277,7 +285,7 @@ describe("/v1/select-zls-version", () => {
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "bbb",
+            shasum: "ccc",
             size: "12",
           },
         },
@@ -290,7 +298,7 @@ describe("/v1/select-zls-version", () => {
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "bbb",
+            shasum: "ccc",
             size: "12",
           },
         },
@@ -310,7 +318,7 @@ describe("/v1/select-zls-version", () => {
         },
         "aarch64-windows": {
           tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-          shasum: "bbb",
+          shasum: "ccc",
           size: "12",
         },
       });

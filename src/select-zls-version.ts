@@ -38,6 +38,8 @@ function artifactsToRecord(
   assert(artifacts.length !== 0);
   const targets: Record<string, ArtifactEntry> = {};
   for (const artifact of artifacts) {
+    if (artifact.extension === "tar.gz") continue;
+    assert(!(`${artifact.arch}-${artifact.os}` in targets));
     targets[`${artifact.arch}-${artifact.os}`] = {
       tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
       shasum: artifact.fileShasum,
