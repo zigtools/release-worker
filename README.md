@@ -13,7 +13,7 @@ Will respond with metadata about a ZLS build that is compatible with the given Z
 The response body is similar to Zig's [index.json](https://ziglang.org/download/index.json).
 
 <details>
-  <summary>Show Example</summary>
+  <summary>Example 1</summary>
   
   ```bash
   curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.13.0-dev.7%2B73c6c13a" # 0.13.0-dev.7+73c6c13a
@@ -63,6 +63,21 @@ The response body is similar to Zig's [index.json](https://ziglang.org/download/
       "shasum": "d81151910728a5b0bd36f0d3f135ad53b6456e5ae26e211ca99fe6156631f93c",
       "size": "2235120"
     }
+  }
+  ```
+  
+</details>
+
+<details>
+  <summary>Example 2</summary>
+  
+  ```bash
+  curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.30.0"
+  ```
+  
+  ```json
+  {
+    "error": "ZLS 0.30.* does not exist!"
   }
   ```
   
@@ -224,7 +239,9 @@ The body is a `multipart/form-data` with the following key value pairs:
 
 All other fields are interpreted as release artifacts. The key must have the following format:
 
-`zls-${OS}-${ARCH}-${ZLS_VERSION}.(tar.xz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
+`zls-${OS}-${ARCH}-${ZLS_VERSION}.(tar.xz|tar.gz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
+
+Artifacts that target windows must be `.zip` files. All other non windows targets must include `.tar.xz` **and** `.tar.gz`.
 
 Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisign` file for every artifact. (Example: `zls-linux-x86_64-0.1.0.tar.xz.minisign`)
 
