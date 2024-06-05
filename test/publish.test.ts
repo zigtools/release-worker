@@ -8,6 +8,7 @@ import {
   getMagicNumberOfExtension,
   gzipMagicNumber,
   SQLiteQueryPlanRow,
+  VersionCompatibility,
   xzMagicNumber,
   zipMagicNumber,
 } from "../src/shared";
@@ -44,6 +45,7 @@ async function sendPublish({
   zigVersion,
   minimumBuildZigVersion,
   minimumRuntimeZigVersion,
+  compatibility,
   artifacts,
   withMinisign,
 }: {
@@ -51,6 +53,7 @@ async function sendPublish({
   zigVersion: string;
   minimumBuildZigVersion?: string;
   minimumRuntimeZigVersion?: string;
+  compatibility?: VersionCompatibility;
   artifacts: [fileName: string, file: Blob][];
   withMinisign?: boolean;
 }): Promise<Response> {
@@ -61,6 +64,13 @@ async function sendPublish({
   form.set(
     "minimum-runtime-zig-version",
     minimumRuntimeZigVersion ?? zigVersion,
+  );
+  form.set(
+    "compatibility",
+    compatibility ??
+      (artifacts.length === 0
+        ? VersionCompatibility.None
+        : VersionCompatibility.Full),
   );
   for (const [fileName, file] of artifacts) {
     assert(!form.has(fileName));
@@ -203,12 +213,14 @@ describe("/v1/publish", () => {
       "zls-version",
       "minimum-build-zig-version",
       "minimum-runtime-zig-version",
+      "compatibility",
     ])("test missing %s field", async (fieldName) => {
       const form = new FormData();
       form.set("zls-version", "0.1.0");
       form.set("zig-version", "0.1.0");
       form.set("minimum-build-zig-version", "0.1.0");
       form.set("minimum-runtime-zig-version", "0.1.0");
+      form.set("compatibility", VersionCompatibility.Full);
       form.delete(fieldName);
       const response = await sendPublishForm(form);
       expect(await response.text()).toBe(`Missing form item '${fieldName}'!`);
@@ -269,6 +281,97 @@ describe("/v1/publish", () => {
         expect(response.status).toBe(400);
       }
     });
+
+    test("new tagged release without full compatibility", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: getSampleArtifacts("0.1.0"),
+        compatibility: VersionCompatibility.OnlyRuntime,
+      });
+
+      expect(await response.text()).toBe(
+        "A new tagged release of ZLS must have full compatibility but was 'only-runtime'!",
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test.each<["successfull" | "failed", string, "ok" | "bad"]>([
+      ["successfull", "", "bad"],
+      ["successfull", "some string", "bad"],
+      ["successfull", "None", "bad"],
+      ["successfull", "OnlyRuntime", "bad"],
+      ["successfull", "Full", "bad"],
+    ])(
+      "invalid compatibility string: %s -> %s",
+      async (compatibilityString, expected) => {
+        const response = await sendPublish({
+          zlsVersion: "0.1.0",
+          zigVersion: "0.1.0",
+          artifacts: getSampleArtifacts("0.1.0"),
+          compatibility: compatibilityString as
+            | VersionCompatibility
+            | undefined,
+        });
+
+        switch (expected) {
+          case "ok":
+            expect(await response.text()).toBe("");
+            expect(response.status).toBe(200);
+            break;
+          case "bad":
+            expect(await response.text()).toBe(
+              `form item 'compatibility' with value '${compatibilityString}' must be one of ["none","only-runtime","full"]!`,
+            );
+            expect(response.status).toBe(400);
+            break;
+        }
+      },
+    );
+
+    test.each<["successfull" | "failed", string, "ok" | "bad"]>([
+      ["successfull", "none", "bad"],
+      ["successfull", "only-runtime", "ok"],
+      ["successfull", "full", "ok"],
+      ["failed", "none", "ok"],
+      ["failed", "only-runtime", "bad"],
+      ["failed", "full", "bad"],
+    ])(
+      "%s build with %s compatibility -> %s",
+      async (kind, compatibilityString, expected) => {
+        const successfullPublish = await sendPublish({
+          zlsVersion: "0.1.0-dev.1+aaaaaaaaa",
+          zigVersion: "0.1.0",
+          artifacts: getSampleArtifacts("0.1.0-dev.1+aaaaaaaaa"),
+        });
+        expect(successfullPublish.status).toBe(200);
+
+        const response = await sendPublish({
+          zlsVersion: "0.1.0-dev.1+aaaaaaaaa",
+          zigVersion: "0.2.0",
+          artifacts:
+            kind === "successfull"
+              ? getSampleArtifacts("0.1.0-dev.1+aaaaaaaaa")
+              : [],
+          compatibility: compatibilityString as
+            | VersionCompatibility
+            | undefined,
+        });
+
+        switch (expected) {
+          case "ok":
+            expect(await response.text()).toBe("");
+            expect(response.status).toBe(200);
+            break;
+          case "bad":
+            expect(await response.text()).toBe(
+              `A ${kind} ZLS build can't have '${compatibilityString}' as its version compatibility!`,
+            );
+            expect(response.status).toBe(400);
+            break;
+        }
+      },
+    );
 
     test.each<[Extension, Uint8Array, "ok" | "bad"]>([
       ["tar.xz", new Uint8Array(xzMagicNumber), "ok"],
@@ -336,6 +439,7 @@ describe("/v1/publish", () => {
       form.set("zig-version", "0.1.0");
       form.set("minimum-build-zig-version", "0.1.0");
       form.set("minimum-runtime-zig-version", "0.1.0");
+      form.set("compatibility", VersionCompatibility.Full);
       form.set("zls-linux-x86_64-0.1.0.tar.xz", "foo");
       const response = await sendPublishForm(form);
       expect(await response.text()).toBe(
@@ -350,6 +454,7 @@ describe("/v1/publish", () => {
       form.set("zig-version", "0.1.0");
       form.set("minimum-build-zig-version", "0.1.0");
       form.set("minimum-runtime-zig-version", "0.1.0");
+      form.set("compatibility", VersionCompatibility.Full);
       form.set(
         "zls-linux-x86_64-0.1.0.tar.xz",
         new Blob([xzMagicNumber, "foo"]),
@@ -654,8 +759,8 @@ describe("/v1/publish", () => {
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
       minisign: false,
-      testedZigVersion: {
-        "0.1.1": true,
+      testedZigVersions: {
+        "0.1.1": VersionCompatibility.Full,
       },
       artifacts: [
         {
@@ -763,8 +868,8 @@ describe("/v1/publish", () => {
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
       minisign: true,
-      testedZigVersion: {
-        "0.1.1": true,
+      testedZigVersions: {
+        "0.1.1": VersionCompatibility.Full,
       },
       artifacts: [
         {
@@ -1001,10 +1106,10 @@ describe("/v1/publish", () => {
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
       minisign: false,
-      testedZigVersion: {
-        "0.1.1": true,
-        "0.1.2": true,
-        "0.1.3": false,
+      testedZigVersions: {
+        "0.1.1": VersionCompatibility.Full,
+        "0.1.2": VersionCompatibility.Full,
+        "0.1.3": VersionCompatibility.None,
       },
       artifacts: [
         {
@@ -1098,9 +1203,9 @@ describe("/v1/publish", () => {
       minimumBuildZigVersion: "0.11.0",
       minimumRuntimeZigVersion: "0.11.0",
       minisign: false,
-      testedZigVersion: {
-        "0.11.0": true,
-        "0.11.1": true,
+      testedZigVersions: {
+        "0.11.0": VersionCompatibility.Full,
+        "0.11.1": VersionCompatibility.Full,
       },
       artifacts: [
         {

@@ -234,8 +234,9 @@ The body is a `multipart/form-data` with the following key value pairs:
 
 - `zls-version`: The ZLS version which must be a semantic version
 - `zig-version`: The Zig version which must be a semantic version
-- `minimum-build-zig-version`: The minimum Zig version that is required to compile and test ZLS:
-- `minimum-runtime-zig-version`: The minimum Zig version that is required to run ZLS:
+- `minimum-build-zig-version`: The minimum Zig version that is required to compile and test ZLS
+- `minimum-runtime-zig-version`: The minimum Zig version that is required to run ZLS
+- `compatibility`: Describes how compatible the Zig and ZLS version are (valid values: `"none"`, `"only-runtime"`, `"full"`)
 
 All other fields are interpreted as release artifacts. The key must have the following format:
 

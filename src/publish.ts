@@ -7,6 +7,7 @@ import {
   D2JsonData,
   Extension,
   ReleaseArtifact,
+  VersionCompatibility,
   getMagicNumberOfExtension,
 } from "./shared";
 import { SemanticVersion } from "./semantic-version";
@@ -187,6 +188,26 @@ export async function handlePublish(
   minBuildZigVersion;
   minRuntimeZigVersion;
 
+  const compatibility = form.get(
+    "compatibility",
+  ) as VersionCompatibility | null;
+
+  if (compatibility === null) {
+    return new Response(`Missing form item 'compatibility'!`, {
+      status: 400, // Bad Request
+    });
+  }
+
+  const validCompatibilityValues = Object.values(VersionCompatibility);
+  if (!validCompatibilityValues.includes(compatibility)) {
+    return new Response(
+      `form item 'compatibility' with value '${compatibility}' must be one of ${JSON.stringify(validCompatibilityValues)}!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
+
   if (zlsVersion.isRelease && !zigVersion.isRelease) {
     return new Response(
       `A tagged release of ZLS '${zlsVersionString}' must be build with a tagged release of Zig but got '${zigVersionString}'.`,
@@ -217,6 +238,7 @@ export async function handlePublish(
     if (key === "zls-version") continue;
     if (key === "minimum-build-zig-version") continue;
     if (key === "minimum-runtime-zig-version") continue;
+    if (key === "compatibility") continue;
 
     if (typeof file === "string") {
       return new Response(`artifact '${key}' must be encoded as a file!`, {
@@ -380,6 +402,27 @@ export async function handlePublish(
     });
   }
 
+  if (zlsVersion.isRelease && compatibility !== VersionCompatibility.Full) {
+    return new Response(
+      `A new tagged release of ZLS must have full compatibility but was '${compatibility}'!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
+
+  if (
+    (artifacts.length === 0) !=
+    (compatibility === VersionCompatibility.None)
+  ) {
+    return new Response(
+      `A ${artifacts.length === 0 ? "failed" : "successfull"} ZLS build can't have '${compatibility}' as its version compatibility!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
+
   if (
     artifacts.length !== 0 &&
     !artifacts.every((artifact) => artifact.version === artifacts[0].version)
@@ -406,7 +449,7 @@ export async function handlePublish(
     minimumBuildZigVersion: minBuildZigVersionString,
     minimumRuntimeZigVersion: minRuntimeZigVersionString,
     minisign: Object.keys(artifactMinisigns).length !== 0,
-    testedZigVersion: {},
+    testedZigVersions: {},
   };
 
   if (artifacts.length === 0) {
@@ -430,7 +473,7 @@ export async function handlePublish(
 
   if (zlsVersion.isRelease) {
     const result = await env.ZIGTOOLS_DB.prepare(
-      "SELECT ZLSVersion FROM ZLSReleases WHERE ZLSVersion = ?1",
+      "SELECT ZLSVersion,JsonData FROM ZLSReleases WHERE ZLSVersion = ?1",
     )
       .bind(zlsVersionString)
       .first<{ ZLSVersion: string }>();
@@ -478,8 +521,8 @@ export async function handlePublish(
     ).bind(
       zlsVersionString,
       JSON.stringify({
-        testedZigVersion: {
-          [zigVersionString]: artifacts.length !== 0,
+        testedZigVersions: {
+          [zigVersionString]: compatibility,
         },
       }),
     ),

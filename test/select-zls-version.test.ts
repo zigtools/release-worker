@@ -1,7 +1,12 @@
 import { env, SELF } from "cloudflare:test";
 import assert from "node:assert";
 import { describe, test, expect, beforeEach } from "vitest";
-import { D2JsonData, ReleaseArtifact, SQLiteQueryPlanRow } from "../src/shared";
+import {
+  D2JsonData,
+  ReleaseArtifact,
+  SQLiteQueryPlanRow,
+  VersionCompatibility,
+} from "../src/shared";
 import {
   handleSelectZLSVersion,
   SelectZLSVersionWithoutVersionResponse,
@@ -45,9 +50,10 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.9.0-dev.15+aaaaaaaaa",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: {
-      "0.9.0-dev.20+aaaaaaaaa": true,
-      "0.9.0-dev.25+aaaaaaaaa": true,
+    testedZigVersions: {
+      "0.9.0-dev.20+aaaaaaaaa": VersionCompatibility.Full,
+      "0.9.0-dev.25+aaaaaaaaa": VersionCompatibility.Full,
+      "0.9.0-dev.30+aaaaaaaaa": VersionCompatibility.OnlyRuntime,
     },
   },
   {
@@ -58,7 +64,7 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.11.0",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: { "0.11.0": true },
+    testedZigVersions: { "0.11.0": VersionCompatibility.Full },
   },
   {
     date: 0,
@@ -68,12 +74,12 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.11.0",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: {
-      "0.11.0": true,
-      "0.12.0-dev.2+aaaaaaaaa": true,
-      "0.12.0-dev.3+aaaaaaaaa": true,
-      "0.12.0-dev.5+aaaaaaaaa": true,
-      "0.12.0-dev.7+aaaaaaaaa": false,
+    testedZigVersions: {
+      "0.11.0": VersionCompatibility.Full,
+      "0.12.0-dev.2+aaaaaaaaa": VersionCompatibility.Full,
+      "0.12.0-dev.3+aaaaaaaaa": VersionCompatibility.Full,
+      "0.12.0-dev.5+aaaaaaaaa": VersionCompatibility.Full,
+      "0.12.0-dev.7+aaaaaaaaa": VersionCompatibility.None,
     },
   },
   {
@@ -84,11 +90,11 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.12.0-dev.7+aaaaaaaaa",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: {
-      "0.12.0-dev.7+aaaaaaaaa": true,
-      "0.12.0-dev.8+aaaaaaaaa": true,
-      "0.12.0-dev.9+aaaaaaaaa": false,
-      "0.12.0-dev.11+aaaaaaaaa": false,
+    testedZigVersions: {
+      "0.12.0-dev.7+aaaaaaaaa": VersionCompatibility.Full,
+      "0.12.0-dev.8+aaaaaaaaa": VersionCompatibility.Full,
+      "0.12.0-dev.9+aaaaaaaaa": VersionCompatibility.None,
+      "0.12.0-dev.11+aaaaaaaaa": VersionCompatibility.None,
     },
   },
   {
@@ -99,8 +105,8 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.12.0-dev.14+aaaaaaaaa",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: {
-      "0.12.0-dev.17+aaaaaaaaa": true,
+    testedZigVersions: {
+      "0.12.0-dev.17+aaaaaaaaa": VersionCompatibility.Full,
     },
   },
   {
@@ -111,7 +117,11 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.12.0",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: { "0.12.0": true, "0.12.1": true, "0.12.2": true },
+    testedZigVersions: {
+      "0.12.0": VersionCompatibility.Full,
+      "0.12.1": VersionCompatibility.Full,
+      "0.12.2": VersionCompatibility.Full,
+    },
   },
   {
     date: 0,
@@ -121,7 +131,7 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.12.0",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: { "0.12.0": true },
+    testedZigVersions: { "0.12.0": VersionCompatibility.Full },
   },
   {
     date: 0,
@@ -131,19 +141,22 @@ const samples: D2JsonData[] = [
     minimumRuntimeZigVersion: "0.13.0",
     minisign: false,
     artifacts: defaultArtifacts,
-    testedZigVersion: {
-      "0.13.0": true,
-      "0.14.0-dev.2+aaaaaaaaa": true,
-      "0.14.0-dev.4+aaaaaaaaa": false,
+    testedZigVersions: {
+      "0.13.0": VersionCompatibility.Full,
+      "0.14.0-dev.2+aaaaaaaaa": VersionCompatibility.Full,
+      "0.14.0-dev.4+aaaaaaaaa": VersionCompatibility.None,
     },
   },
 ];
 
 async function selectZLSVersion(
   zigVersion: string,
+  compatibility: VersionCompatibility,
 ): Promise<SelectZLSVersionWithVersionResponse> {
+  assert(compatibility != VersionCompatibility.None);
   const url = new URL("https://example.com/v1/select-zls-version");
   url.searchParams.set("zig_version", zigVersion);
+  url.searchParams.set("compatibility", compatibility);
 
   const response = await handleSelectZLSVersion(new Request(url, {}), env);
   expect(response.status).toBe(200);
@@ -195,6 +208,29 @@ describe("/v1/select-zls-version", () => {
     expect(response.status).toBe(400);
   });
 
+  test("missing compatibility query", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/select-zls-version?zig_version=0.11.0",
+    );
+    expect(await response.text()).toBe(
+      "Expected query component 'compatibility'!",
+    );
+    expect(response.status).toBe(400);
+  });
+
+  test.each<string>(["", "foo", "none", "None", "OnlyRuntime", "Full"])(
+    "invalid compatibility string: %s",
+    async (compatibility) => {
+      const response = await SELF.fetch(
+        `https://example.com/v1/select-zls-version?zig_version=0.11.0&compatibility=${compatibility}`,
+      );
+      expect(await response.text()).toBe(
+        `form item 'compatibility' with value '${compatibility}' must be one of ["only-runtime","full"]!`,
+      );
+      expect(response.status).toBe(400);
+    },
+  );
+
   test("search on empty database", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version",
@@ -205,7 +241,7 @@ describe("/v1/select-zls-version", () => {
 
   test("search on empty database with Zig version", async () => {
     const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version?zig_version=0.11.0",
+      "https://example.com/v1/select-zls-version?zig_version=0.11.0&compatibility=full",
     );
     expect(await response.json()).toStrictEqual({
       error: "ZLS 0.11.* does not exist!",
@@ -307,7 +343,10 @@ describe("/v1/select-zls-version", () => {
     });
 
     test("search for with Version 0.11.0", async () => {
-      const response = await selectZLSVersion("0.11.0");
+      const response = await selectZLSVersion(
+        "0.11.0",
+        VersionCompatibility.Full,
+      );
       expect(response).toStrictEqual<SelectZLSVersionWithVersionResponse>({
         date: "1970-01-01",
         version: "0.11.0",
@@ -324,51 +363,63 @@ describe("/v1/select-zls-version", () => {
       });
     });
 
-    test.each<[string, string | null]>([
-      ["0.0.0", null],
-      ["0.0.0-dev.1+aaaaaaaaa", null],
-      ["0.7.0-dev.5+aaaaaaaaa", null],
-      ["0.9.0-dev.10+aaaaaaaaa", null],
-      ["0.9.0-dev.15+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.20+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.25+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.30+aaaaaaaaa", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0", null],
-      ["0.10.0-dev.5+aaaaaaaaa", null],
-      ["0.10.0", null],
-      ["0.11.0-dev.1+aaaaaaaaa", null],
-      ["0.11.0-dev.5+aaaaaaaaa", null],
-      ["0.11.0", "0.11.0"],
-      ["0.11.1", "0.11.0"],
-      ["0.12.0-dev.1+aaaaaaaaa", "0.12.0-dev.1+aaaaaaaaa"],
-      ["0.12.0-dev.2+aaaaaaaaa", "0.12.0-dev.1+aaaaaaaaa"],
-      ["0.12.0-dev.5+aaaaaaaaa", "0.12.0-dev.1+aaaaaaaaa"],
-      ["0.12.0-dev.6+aaaaaaaaa", "0.12.0-dev.1+aaaaaaaaa"],
-      ["0.12.0-dev.7+aaaaaaaaa", "0.12.0-dev.2+aaaaaaaaa"],
-      ["0.12.0-dev.8+aaaaaaaaa", "0.12.0-dev.2+aaaaaaaaa"],
-      ["0.12.0-dev.9+aaaaaaaaa", null],
-      ["0.12.0-dev.10+aaaaaaaaa", null],
-      ["0.12.0-dev.13+aaaaaaaaa", null],
-      ["0.12.0-dev.14+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
-      ["0.12.0-dev.15+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
-      ["0.12.0-dev.17+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
-      ["0.12.0-dev.18+aaaaaaaaa", "0.12.0-dev.3+aaaaaaaaa"],
-      ["0.12.0", "0.12.1"],
-      ["0.12.1", "0.12.1"],
-      ["0.13.0-dev.1+aaaaaaaaa", "0.12.1"],
-      ["0.13.0", "0.13.0"],
-      ["0.14.0", null],
-      ["0.15.0", null],
-    ])("Zig %s -> ZLS %s", async (zigVersion, expectedZLSVersion) => {
-      const response = await selectZLSVersion(zigVersion);
-      if (expectedZLSVersion === null) {
-        expect(response).toHaveProperty("error");
-      } else {
-        expect(response).not.toHaveProperty("error");
-        assert(!("error" in response));
-        expect(response.version).toBe<string>(expectedZLSVersion);
-      }
-    });
+    test.each<[string, keyof typeof VersionCompatibility, string | null]>([
+      ["0.0.0", "Full", null],
+      ["0.0.0-dev.1+aaaaaaaaa", "Full", null],
+      ["0.7.0-dev.5+aaaaaaaaa", "Full", null],
+      ["0.9.0-dev.10+aaaaaaaaa", "Full", null],
+      ["0.9.0-dev.15+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.20+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.25+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.27+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.27+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.30+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.30+aaaaaaaaa", "Full", null],
+      ["0.9.0-dev.35+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.35+aaaaaaaaa", "Full", null],
+      ["0.9.0", "Full", null],
+      ["0.10.0-dev.5+aaaaaaaaa", "Full", null],
+      ["0.10.0", "Full", null],
+      ["0.11.0-dev.1+aaaaaaaaa", "Full", null],
+      ["0.11.0-dev.5+aaaaaaaaa", "Full", null],
+      ["0.11.0", "Full", "0.11.0"],
+      ["0.11.1", "Full", "0.11.0"],
+      ["0.12.0-dev.1+aaaaaaaaa", "Full", "0.12.0-dev.1+aaaaaaaaa"],
+      ["0.12.0-dev.2+aaaaaaaaa", "Full", "0.12.0-dev.1+aaaaaaaaa"],
+      ["0.12.0-dev.5+aaaaaaaaa", "Full", "0.12.0-dev.1+aaaaaaaaa"],
+      ["0.12.0-dev.6+aaaaaaaaa", "Full", "0.12.0-dev.1+aaaaaaaaa"],
+      ["0.12.0-dev.7+aaaaaaaaa", "Full", "0.12.0-dev.2+aaaaaaaaa"],
+      ["0.12.0-dev.8+aaaaaaaaa", "Full", "0.12.0-dev.2+aaaaaaaaa"],
+      ["0.12.0-dev.9+aaaaaaaaa", "Full", null],
+      ["0.12.0-dev.10+aaaaaaaaa", "Full", null],
+      ["0.12.0-dev.13+aaaaaaaaa", "Full", null],
+      ["0.12.0-dev.14+aaaaaaaaa", "Full", "0.12.0-dev.3+aaaaaaaaa"],
+      ["0.12.0-dev.15+aaaaaaaaa", "Full", "0.12.0-dev.3+aaaaaaaaa"],
+      ["0.12.0-dev.17+aaaaaaaaa", "Full", "0.12.0-dev.3+aaaaaaaaa"],
+      ["0.12.0-dev.18+aaaaaaaaa", "Full", "0.12.0-dev.3+aaaaaaaaa"],
+      ["0.12.0", "Full", "0.12.1"],
+      ["0.12.1", "Full", "0.12.1"],
+      ["0.13.0-dev.1+aaaaaaaaa", "Full", "0.12.1"],
+      ["0.13.0", "Full", "0.13.0"],
+      ["0.14.0", "Full", null],
+      ["0.15.0", "Full", null],
+    ])(
+      "Zig %s, %s -> ZLS %s",
+      async (zigVersion, compatibility, expectedZLSVersion) => {
+        const response = await selectZLSVersion(
+          zigVersion,
+          VersionCompatibility[compatibility],
+        );
+        if (expectedZLSVersion === null) {
+          expect(response).not.toHaveProperty("version");
+          expect(response).toHaveProperty("error");
+        } else {
+          expect(response).not.toHaveProperty("error");
+          assert(!("error" in response));
+          expect(response.version).toBe<string>(expectedZLSVersion);
+        }
+      },
+    );
 
     test.each<[string, string]>([
       ["0.10.0", "ZLS 0.10.* does not exist!"],
@@ -383,8 +434,15 @@ describe("/v1/select-zls-version", () => {
         "0.9.0-dev.10+aaaaaaaaa",
         "Zig 0.9.0-dev.10+aaaaaaaaa is not supported by ZLS",
       ],
+      [
+        "0.12.0-dev.13+aaaaaaaaa",
+        "Zig 0.12.0-dev.13+aaaaaaaaa has no compatible ZLS build (yet)",
+      ],
     ])("Zig %s -> %s", async (zigVersion, expectedError) => {
-      const response = await selectZLSVersion(zigVersion);
+      const response = await selectZLSVersion(
+        zigVersion,
+        VersionCompatibility.Full,
+      );
       expect(response).toStrictEqual({
         error: expectedError,
       });

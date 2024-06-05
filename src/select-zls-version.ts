@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { Env } from "./env";
 import { Order, SemanticVersion } from "./semantic-version";
-import { D2JsonData, ReleaseArtifact } from "./shared";
+import { D2JsonData, ReleaseArtifact, VersionCompatibility } from "./shared";
 
 /**
  * Similar to https://ziglang.org/download/index.json
@@ -51,7 +51,7 @@ function artifactsToRecord(
 
 /**
  * - `${ENDPOINT}/select-zls-version`
- * - `${ENDPOINT}/select-zls-version?zig_version=0.12.0`
+ * - `${ENDPOINT}/select-zls-version?zig_version=0.12.0&compatibility=full`
  */
 export async function handleSelectZLSVersion(
   request: Request,
@@ -106,9 +106,31 @@ export async function handleSelectZLSVersion(
     );
   }
 
+  const compatibility = url.searchParams.get(
+    "compatibility",
+  ) as VersionCompatibility | null;
+
+  if (compatibility === null) {
+    return new Response(`Expected query component 'compatibility'!`, {
+      status: 400, // Bad Request
+    });
+  }
+
+  assert(Object.values(VersionCompatibility)[0] === VersionCompatibility.None);
+  const validCompatibilityValues = Object.values(VersionCompatibility).slice(1);
+  if (!validCompatibilityValues.includes(compatibility)) {
+    return new Response(
+      `form item 'compatibility' with value '${compatibility}' must be one of ${JSON.stringify(validCompatibilityValues)}!`,
+      {
+        status: 400, // Bad Request
+      },
+    );
+  }
+  assert(compatibility != VersionCompatibility.None);
+
   const selectedVersion = zigVersion.isRelease
     ? await selectOnTaggedRelease(env, zigVersion)
-    : await selectOnDevelopmentBuild(env, zigVersion);
+    : await selectOnDevelopmentBuild(env, zigVersion, compatibility);
 
   let response: SelectZLSVersionWithVersionResponse;
 
@@ -221,6 +243,7 @@ function isVersionEnclosedInFailure(
 async function selectOnDevelopmentBuild(
   env: Env,
   zigVersion: SemanticVersion,
+  compatibility: Exclude<VersionCompatibility, VersionCompatibility.None>,
 ): Promise<D2JsonData | { error: string }> {
   assert(!zigVersion.isRelease);
 
@@ -285,11 +308,39 @@ async function selectOnDevelopmentBuild(
     }
   }
 
-  const testedZigVersions = Object.entries(selectedEntry.testedZigVersion)
-    .map(([versionString, isSuccess]) => {
+  assert.equal(
+    selectedEntry.testedZigVersions[selectedEntry.zigVersion],
+    VersionCompatibility.Full,
+  );
+  const testedZigVersions = Object.entries(selectedEntry.testedZigVersions)
+    .map(([versionString, testedCompatibility]) => {
       const semver = SemanticVersion.parse(versionString);
       assert(semver !== null);
-      return { version: semver, isSuccess: isSuccess };
+
+      let isSuccess: boolean;
+      switch (testedCompatibility) {
+        case VersionCompatibility.None:
+          isSuccess = false;
+          break;
+        case VersionCompatibility.OnlyRuntime:
+          switch (compatibility) {
+            case VersionCompatibility.OnlyRuntime:
+              isSuccess = true;
+              break;
+            case VersionCompatibility.Full:
+              isSuccess = false;
+              break;
+          }
+          break;
+        case VersionCompatibility.Full:
+          isSuccess = true;
+          break;
+      }
+
+      return {
+        version: semver,
+        isSuccess: isSuccess,
+      };
     })
     .sort((lhs, rhs) => SemanticVersion.order(lhs.version, rhs.version));
   assert(testedZigVersions.length !== 0);

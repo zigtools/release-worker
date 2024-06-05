@@ -12,9 +12,18 @@ export interface D2JsonData {
   minimumBuildZigVersion: string;
   minimumRuntimeZigVersion: string;
   minisign: boolean;
-  /** Always contains the `zigVersion` */
-  testedZigVersion: Record<string, boolean>;
+  /** guarantees `testedZigVersions[zigVersion] == Compatibility.Full` */
+  testedZigVersions: Record<string, VersionCompatibility>;
   artifacts: ReleaseArtifact[];
+}
+
+export enum VersionCompatibility {
+  /** The given Zig version is not compatible */
+  None = "none",
+  /** ZLS can't be compiled with the given Zig version but is compatible at runtime. */
+  OnlyRuntime = "only-runtime",
+  /** Has been successfully build and tested with the given Zig version. */
+  Full = "full",
 }
 
 export interface ReleaseArtifact {
