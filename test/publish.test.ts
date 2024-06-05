@@ -28,7 +28,7 @@ async function searchZLSRelease(
 
 async function sendPublishForm(form: FormData): Promise<Response> {
   assert(typeof env.API_TOKEN === "string" && env.API_TOKEN);
-  return await handlePublish(
+  return await SELF.fetch(
     new Request("https://example.com/v1/publish", {
       body: form,
       method: "POST",
@@ -36,7 +36,6 @@ async function sendPublishForm(form: FormData): Promise<Response> {
         Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
       },
     }),
-    env,
   );
 }
 
@@ -234,7 +233,7 @@ describe("/v1/publish", () => {
         artifacts: getSampleArtifacts("0.1.0"),
       });
 
-      expect(response.body).toBe(null);
+      expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
     });
 

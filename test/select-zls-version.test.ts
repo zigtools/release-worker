@@ -158,7 +158,7 @@ async function selectZLSVersion(
   url.searchParams.set("zig_version", zigVersion);
   url.searchParams.set("compatibility", compatibility);
 
-  const response = await handleSelectZLSVersion(new Request(url, {}), env);
+  const response = await SELF.fetch(url);
   expect(response.status).toBe(200);
   return await response.json();
 }
@@ -272,9 +272,8 @@ describe("/v1/select-zls-version", () => {
     });
 
     test("search without version", async () => {
-      const response = await handleSelectZLSVersion(
-        new Request("https://example.com/v1/select-zls-version"),
-        env,
+      const response = await SELF.fetch(
+        "https://example.com/v1/select-zls-version",
       );
       const body =
         await response.json<SelectZLSVersionWithoutVersionResponse>();
