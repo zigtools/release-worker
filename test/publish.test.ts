@@ -214,7 +214,7 @@ describe("/v1/publish", () => {
       "minimum-build-zig-version",
       "minimum-runtime-zig-version",
       "compatibility",
-    ])("test missing %s field", async (fieldName) => {
+    ])("missing '%s' field", async (fieldName) => {
       const form = new FormData();
       form.set("zls-version", "0.1.0");
       form.set("zig-version", "0.1.0");
@@ -227,7 +227,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate response is empty body", async () => {
+    test("response should be empty body", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -243,7 +243,7 @@ describe("/v1/publish", () => {
       ["some string", "bad"],
       ["0.1.0", "ok"],
       ["0.1.0-dev.1+aaaaaaa", "ok"],
-    ])("validate ZLS version: %j -> %s", async (zlsVersion, kind) => {
+    ])("validate ZLS version: '%s' -> %s", async (zlsVersion, kind) => {
       const response = await sendPublish({
         zlsVersion: zlsVersion,
         zigVersion: "0.1.0",
@@ -265,7 +265,7 @@ describe("/v1/publish", () => {
       ["some string", "bad"],
       ["0.1.0", "ok"],
       ["0.1.0-dev.1+aaaaaaaaa", "ok"],
-    ])("validate Zig version: %s -> %s", async (zigVersion, expected) => {
+    ])("validate Zig version: '%s' -> %s", async (zigVersion, expected) => {
       const response = await sendPublish({
         zlsVersion: "0.1.0-dev.1+aaaaaaaaa",
         zigVersion: zigVersion,
@@ -282,7 +282,7 @@ describe("/v1/publish", () => {
       }
     });
 
-    test("new tagged release without full compatibility", async () => {
+    test("new tagged release should have full compatibility", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -389,7 +389,7 @@ describe("/v1/publish", () => {
       ["zip", new Uint8Array(gzipMagicNumber), "bad"],
       ["zip", new Uint8Array([1, 2, 3, 4]), "bad"],
     ])(
-      "validate file magic number: %s %s %s",
+      "file magic number: '%s' %s -> %s",
       async (extension, body, expected) => {
         let artifacts: [fileName: string, file: Blob][];
         switch (extension) {
@@ -433,7 +433,7 @@ describe("/v1/publish", () => {
       },
     );
 
-    test("validate that artifact is a file", async () => {
+    test("artifact should be a file", async () => {
       const form = new FormData();
       form.set("zls-version", "0.1.0");
       form.set("zig-version", "0.1.0");
@@ -448,7 +448,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate that artifact file name matches form key", async () => {
+    test("artifact file name should match form key", async () => {
       const form = new FormData();
       form.set("zls-version", "0.1.0");
       form.set("zig-version", "0.1.0");
@@ -467,7 +467,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate that artifact is not empty", async () => {
+    test("artifact should not be empty", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -537,7 +537,7 @@ describe("/v1/publish", () => {
       }
     });
 
-    test("validate that all artifacts have the same version", async () => {
+    test("all artifacts should have the same version", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -562,7 +562,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate that artifact version in file name matches ZLS version", async () => {
+    test("artifact version in file name should match ZLS version", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -574,7 +574,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate that zip artifacts are on windows", async () => {
+    test("zip artifacts should be on windows", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -588,7 +588,7 @@ describe("/v1/publish", () => {
       expect(response.status).toBe(400);
     });
 
-    test("validate that non zip artifacts are not on windows", async () => {
+    test("non zip artifacts should not be on windows", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -638,29 +638,26 @@ describe("/v1/publish", () => {
         ["zip", "tar.xz", "tar.gz"],
         `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip","tar.xz","tar.gz"]!`,
       ],
-    ])(
-      "validate artifact extensions: %j",
-      async (extensions, expectedError) => {
-        const artifacts: [fileName: string, file: Blob][] = [];
-        for (const extension of extensions) {
-          artifacts.push([
-            `zls-linux-x86_64-0.1.0.${extension}`,
-            new Blob([getMagicNumberOfExtension(extension), "binary1"]),
-          ]);
-        }
+    ])("invalid artifact extensions: %j", async (extensions, expectedError) => {
+      const artifacts: [fileName: string, file: Blob][] = [];
+      for (const extension of extensions) {
+        artifacts.push([
+          `zls-linux-x86_64-0.1.0.${extension}`,
+          new Blob([getMagicNumberOfExtension(extension), "binary1"]),
+        ]);
+      }
 
-        const response = await sendPublish({
-          zlsVersion: "0.1.0",
-          zigVersion: "0.1.0",
-          artifacts: artifacts,
-        });
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: artifacts,
+      });
 
-        expect(await response.text()).toBe(expectedError);
-        expect(response.status).toBe(400);
-      },
-    );
+      expect(await response.text()).toBe(expectedError);
+      expect(response.status).toBe(400);
+    });
 
-    test("validate that tar.xz and tar.gz are always published together", async () => {
+    test("'tar.xz' and 'tar.gz' should always be published together", async () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
@@ -683,7 +680,7 @@ describe("/v1/publish", () => {
       ["0.1.0-dev.1+aaaaaaa", "0.1.0", "ok"],
       ["0.1.0-dev.1+aaaaaaa", "0.1.0-dev.1+aaaaaaaaa", "ok"],
     ])(
-      "validate compatibility: ZLS %s Zig %s -> %s",
+      "publishing ZLS %s with Zig %s -> %s",
       async (zlsVersion, zigVersion, expected) => {
         const response = await sendPublish({
           zlsVersion: zlsVersion,

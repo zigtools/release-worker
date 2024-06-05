@@ -171,7 +171,7 @@ function shuffleArray(array: unknown[]) {
 }
 
 describe("/v1/select-zls-version", () => {
-  test("expect GET method", async () => {
+  test("method should be 'GET'", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/select-zls-version",
       {
@@ -219,7 +219,7 @@ describe("/v1/select-zls-version", () => {
   });
 
   test.each<string>(["", "foo", "none", "None", "OnlyRuntime", "Full"])(
-    "invalid compatibility string: %s",
+    "invalid compatibility string: '%s'",
     async (compatibility) => {
       const response = await SELF.fetch(
         `https://example.com/v1/select-zls-version?zig_version=0.11.0&compatibility=${compatibility}`,
@@ -438,7 +438,7 @@ describe("/v1/select-zls-version", () => {
         "0.12.0-dev.13+aaaaaaaaa",
         "Zig 0.12.0-dev.13+aaaaaaaaa has no compatible ZLS build (yet)",
       ],
-    ])("Zig %s -> %s", async (zigVersion, expectedError) => {
+    ])("Zig %s should error with '%s'", async (zigVersion, expectedError) => {
       const response = await selectZLSVersion(
         zigVersion,
         VersionCompatibility.Full,
