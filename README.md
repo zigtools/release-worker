@@ -244,7 +244,7 @@ All other fields are interpreted as release artifacts. The key must have the fol
 
 Artifacts that target windows must be `.zip` files. All other non windows targets must include `.tar.xz` **and** `.tar.gz`.
 
-Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisign` file for every artifact. (Example: `zls-linux-x86_64-0.1.0.tar.xz.minisign`)
+Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisig` file for every artifact. (Example: `zls-linux-x86_64-0.1.0.tar.xz.minisig`)
 
 ## Development
 

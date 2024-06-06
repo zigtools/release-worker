@@ -75,7 +75,7 @@ async function sendPublish({
     assert(!form.has(fileName));
     form.set(fileName, file, fileName);
     if (withMinisign ?? false) {
-      const minisignFileName = `${fileName}.minisign`;
+      const minisignFileName = `${fileName}.minisig`;
       assert(!form.has(minisignFileName));
       form.set(
         minisignFileName,
@@ -901,14 +901,14 @@ describe("/v1/publish", () => {
         size: gzipMagicNumber.length + 7,
       },
       {
-        key: "zls-linux-x86_64-0.1.0.tar.gz.minisign",
+        key: "zls-linux-x86_64-0.1.0.tar.gz.minisig",
       },
       {
         key: "zls-linux-x86_64-0.1.0.tar.xz",
         size: xzMagicNumber.length + 7,
       },
       {
-        key: "zls-linux-x86_64-0.1.0.tar.xz.minisign",
+        key: "zls-linux-x86_64-0.1.0.tar.xz.minisig",
       },
     ]);
   });
@@ -948,12 +948,12 @@ describe("/v1/publish", () => {
           "zls-linux-x86_64-0.11.0.tar.xz",
           new Blob([xzMagicNumber, "binary1"]),
         ],
-        ["zls-linux-x86_64-0.11.0.tar.xz.minisign", new Blob(["something"])],
+        ["zls-linux-x86_64-0.11.0.tar.xz.minisig", new Blob(["something"])],
         [
           "zls-linux-x86_64-0.11.0.tar.gz",
           new Blob([gzipMagicNumber, "binary1"]),
         ],
-        ["zls-linux-x86_64-0.11.0.tar.gz.minisign", new Blob(["something"])],
+        ["zls-linux-x86_64-0.11.0.tar.gz.minisig", new Blob(["something"])],
         [
           "zls-windows-aarch64-0.11.0.zip",
           new Blob([zipMagicNumber, "binary2"]),
@@ -972,12 +972,12 @@ describe("/v1/publish", () => {
       zlsVersion: "0.1.0",
       zigVersion: "0.1.0",
       artifacts: [
-        ["zls-linux-x86_64-0.11.0.tar.xz.minisign", new Blob(["something"])],
+        ["zls-linux-x86_64-0.11.0.tar.xz.minisig", new Blob(["something"])],
       ],
     });
 
     expect(await response.text()).toBe(
-      "minisign file 'zls-linux-x86_64-0.11.0.tar.xz.minisign' has not matching artifact!",
+      "minisign file 'zls-linux-x86_64-0.11.0.tar.xz.minisig' has not matching artifact!",
     );
     expect(response.status).toBe(400);
   });

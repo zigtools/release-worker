@@ -261,7 +261,7 @@ export async function handlePublish(
       });
     }
 
-    if (key.endsWith(".minisign")) {
+    if (key.endsWith(".minisig")) {
       assert(!(key in artifactMinisigns)); // keys are unique
       artifactMinisigns[key] = file;
       continue;
@@ -364,7 +364,7 @@ export async function handlePublish(
 
   for (const minisignFileName of Object.keys(artifactMinisigns)) {
     const artifactIndex = artifactFiles.findIndex(
-      (file) => `${file.name}.minisign` == minisignFileName,
+      (file) => `${file.name}.minisig` == minisignFileName,
     );
     if (artifactIndex === -1) {
       return new Response(
@@ -535,7 +535,7 @@ export async function handlePublish(
   for (let i = 0; i < artifacts.length; i++) {
     const artifact = artifacts[i];
     const file = artifactFiles[i];
-    const minisignFile = artifactMinisigns[`${file.name}.minisign`];
+    const minisignFile = artifactMinisigns[`${file.name}.minisig`];
 
     promises.push(
       env.ZIGTOOLS_BUILDS.put(file.name, file, {
