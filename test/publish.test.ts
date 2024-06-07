@@ -29,7 +29,7 @@ async function searchZLSRelease(
 async function sendPublishForm(form: FormData): Promise<Response> {
   assert(typeof env.API_TOKEN === "string" && env.API_TOKEN);
   return await SELF.fetch(
-    new Request("https://example.com/v1/publish", {
+    new Request("https://example.com/publish", {
       body: form,
       method: "POST",
       headers: {
@@ -104,9 +104,9 @@ function getSampleArtifacts(
   ];
 }
 
-describe("/v1/publish", () => {
+describe("/publish", () => {
   test("expect POST method", async () => {
-    const response = await SELF.fetch("https://example.com/v1/publish");
+    const response = await SELF.fetch("https://example.com/publish");
     expect(await response.text()).toBe("method must be 'POST'");
     expect(response.status).toBe(405);
   });
@@ -115,7 +115,7 @@ describe("/v1/publish", () => {
     "check for invalid API_TOKEN: %j",
     async (value) => {
       const response = await handlePublish(
-        new Request("https://example.com/v1/publish", {
+        new Request("https://example.com/publish", {
           method: "POST",
         }),
         {
@@ -131,7 +131,7 @@ describe("/v1/publish", () => {
 
   describe("check authorization", () => {
     test("missing Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/publish", {
+      const response = await SELF.fetch("https://example.com/publish", {
         method: "POST",
       });
 
@@ -140,7 +140,7 @@ describe("/v1/publish", () => {
     });
 
     test("invalid Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/publish", {
+      const response = await SELF.fetch("https://example.com/publish", {
         body: null,
         method: "POST",
         headers: {
@@ -154,7 +154,7 @@ describe("/v1/publish", () => {
     });
 
     test("non Basic Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/publish", {
+      const response = await SELF.fetch("https://example.com/publish", {
         body: null,
         method: "POST",
         headers: {
@@ -168,7 +168,7 @@ describe("/v1/publish", () => {
     });
 
     test("invalid Basic Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/publish", {
+      const response = await SELF.fetch("https://example.com/publish", {
         body: null,
         method: "POST",
         headers: {
@@ -182,7 +182,7 @@ describe("/v1/publish", () => {
     });
 
     test("wrong username", async () => {
-      const response = await SELF.fetch("https://example.com/v1/publish", {
+      const response = await SELF.fetch("https://example.com/publish", {
         body: null,
         method: "POST",
         headers: {
@@ -194,7 +194,7 @@ describe("/v1/publish", () => {
     });
 
     test("wrong password", async () => {
-      const response = await SELF.fetch("https://example.com/v1/publish", {
+      const response = await SELF.fetch("https://example.com/publish", {
         body: null,
         method: "POST",
         headers: {

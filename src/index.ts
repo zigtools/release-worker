@@ -9,7 +9,7 @@ export default {
     switch (url.pathname) {
       case "/v1/select-zls-version":
         return handleSelectZLSVersion(request, env);
-      case "/v1/publish":
+      case "/publish":
         return handlePublish(request, env);
       default:
         return new Response(null, {

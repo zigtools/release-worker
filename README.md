@@ -4,19 +4,24 @@ A Cloudflare Worker for managing ZLS build artifacts.
 
 The API Endpoint is `releases.zigtools.org`.
 
-## /v1/select-zls-version?zig_version=${VERSION}
+## /v1/select-zls-version?zig_version=${VERSION}&compatibility=${COMPATIBILITY}
 
 > [!IMPORTANT]
 > If you are developing a tool that automatically installs ZLS then you came to the right place!
 
-Will respond with metadata about a ZLS build that is compatible with the given Zig version.
+Will respond with metadata about a ZLS build that is useable with the given Zig version.
 The response body is similar to Zig's [index.json](https://ziglang.org/download/index.json).
+
+The `compatibility` query-string must be either `only-runtime` or `full`:
+
+- `full`: Request a ZLS build that can be built and used with the given Zig version.
+- `only-runtime`: Request a ZLS build that can be used at runtime with the given Zig version but may not be able to build ZLS from source.
 
 <details>
   <summary>Example 1</summary>
   
   ```bash
-  curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.13.0-dev.7%2B73c6c13a" # 0.13.0-dev.7+73c6c13a
+  curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.13.0-dev.7%2B73c6c13a&compatibility=only-runtime" # 0.13.0-dev.7+73c6c13a
   ```
   
   ```json
@@ -225,7 +230,7 @@ The response body imitates Zig's [index.json](https://ziglang.org/download/index
   
 </details>
 
-## /v1/publish
+## /publish
 
 > [!IMPORTANT]
 > This request is only intended to be used by ZLS's GitHub CI.
