@@ -8,7 +8,9 @@ import { D2JsonData, ReleaseArtifact, VersionCompatibility } from "./shared";
  */
 export type SelectZLSVersionWithVersionResponse =
   | {
+      /** The ZLS version */
       version: string;
+      /** `YYYY-MM-DD` */
       date: string;
       [artifact: string]: ArtifactEntry | string | undefined;
     }
@@ -20,14 +22,18 @@ export type SelectZLSVersionWithVersionResponse =
 export type SelectZLSVersionWithoutVersionResponse = Record<
   string,
   {
+    /** `YYYY-MM-DD` */
     date: string;
     [artifact: string]: ArtifactEntry | string | undefined;
   }
 >;
 
 export interface ArtifactEntry {
+  /** A download URL */
   tarball: string;
+  /** A SHA256 hash of the tarball */
   shasum: string;
+  /** Size of the tarball in bytes */
   size: string;
 }
 
