@@ -6,7 +6,7 @@ import { D2JsonData, ReleaseArtifact, VersionCompatibility } from "./shared";
 /**
  * Similar to https://ziglang.org/download/index.json
  */
-export type SelectZLSVersionWithVersionResponse =
+export type SelectZLSVersionWithZigVersionResponse =
   | {
       /** The ZLS version */
       version: string;
@@ -19,7 +19,7 @@ export type SelectZLSVersionWithVersionResponse =
 /**
  * Similar to https://ziglang.org/download/index.json
  */
-export type SelectZLSVersionWithoutVersionResponse = Record<
+export type SelectZLSVersionWithoutZigVersionResponse = Record<
   string,
   {
     /** `YYYY-MM-DD` */
@@ -84,7 +84,7 @@ export async function handleSelectZLSVersion(
       "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
     ).all<{ JsonData: string }>();
 
-    const response: SelectZLSVersionWithoutVersionResponse = {};
+    const response: SelectZLSVersionWithoutZigVersionResponse = {};
 
     for (const entry of result.results) {
       const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
@@ -138,7 +138,7 @@ export async function handleSelectZLSVersion(
     ? await selectOnTaggedRelease(env, zigVersion)
     : await selectOnDevelopmentBuild(env, zigVersion, compatibility);
 
-  let response: SelectZLSVersionWithVersionResponse;
+  let response: SelectZLSVersionWithZigVersionResponse;
 
   if ("error" in selectedVersion) {
     response = selectedVersion;

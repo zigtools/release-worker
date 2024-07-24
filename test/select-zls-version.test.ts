@@ -9,8 +9,8 @@ import {
 } from "../src/shared";
 import {
   handleSelectZLSVersion,
-  SelectZLSVersionWithoutVersionResponse,
-  SelectZLSVersionWithVersionResponse,
+  SelectZLSVersionWithoutZigVersionResponse,
+  SelectZLSVersionWithZigVersionResponse,
 } from "../src/select-zls-version";
 import { SemanticVersion } from "../src/semantic-version";
 
@@ -152,7 +152,7 @@ const samples: D2JsonData[] = [
 async function selectZLSVersion(
   zigVersion: string,
   compatibility: VersionCompatibility,
-): Promise<SelectZLSVersionWithVersionResponse> {
+): Promise<SelectZLSVersionWithZigVersionResponse> {
   assert(compatibility != VersionCompatibility.None);
   const url = new URL("https://example.com/v1/select-zls-version");
   url.searchParams.set("zig_version", zigVersion);
@@ -280,7 +280,7 @@ describe("/v1/select-zls-version", () => {
         "https://example.com/v1/select-zls-version",
       );
       const body =
-        await response.json<SelectZLSVersionWithoutVersionResponse>();
+        await response.json<SelectZLSVersionWithoutZigVersionResponse>();
 
       expect(Object.keys(body)).toStrictEqual([
         "0.13.0",
@@ -350,7 +350,7 @@ describe("/v1/select-zls-version", () => {
         "0.11.0",
         VersionCompatibility.Full,
       );
-      expect(response).toStrictEqual<SelectZLSVersionWithVersionResponse>({
+      expect(response).toStrictEqual<SelectZLSVersionWithZigVersionResponse>({
         date: "1970-01-01",
         version: "0.11.0",
         "x86_64-linux": {
