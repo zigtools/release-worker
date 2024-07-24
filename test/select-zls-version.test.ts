@@ -180,6 +180,8 @@ describe("/v1/select-zls-version", () => {
     );
     expect(await response.text()).toBe("method must be 'GET'");
     expect(response.status).toBe(405);
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
   });
 
   test.each<unknown>([null, "", {}, []])(
@@ -237,6 +239,8 @@ describe("/v1/select-zls-version", () => {
     );
     expect(await response.json()).toStrictEqual({});
     expect(response.status).toBe(200);
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(true);
+    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(true);
   });
 
   test("search on empty database with Zig version", async () => {
