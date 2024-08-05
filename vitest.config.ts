@@ -4,7 +4,7 @@ import {
   readD1Migrations,
 } from "@cloudflare/vitest-pool-workers/config";
 
-export default defineWorkersConfig(async () => {
+export default defineWorkersConfig(async (env) => {
   // Read all migrations in the `migrations` directory
   const migrationsPath = path.join(__dirname, "migrations");
   const migrations = await readD1Migrations(migrationsPath);
