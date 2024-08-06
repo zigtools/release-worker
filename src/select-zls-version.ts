@@ -6,20 +6,85 @@ import { D2JsonData, ReleaseArtifact, VersionCompatibility } from "./shared";
 /**
  * Similar to https://ziglang.org/download/index.json
  */
-export type SelectZLSVersionWithZigVersionResponse =
-  | {
-      /** The ZLS version */
-      version: string;
-      /** `YYYY-MM-DD` */
-      date: string;
-      [artifact: string]: ArtifactEntry | string | undefined;
-    }
-  | { error: string };
+export interface SelectVersionResponse {
+  /** The ZLS version */
+  version: string;
+  /** `YYYY-MM-DD` */
+  date: string;
+  [artifact: string]: ArtifactEntry | string | undefined;
+}
+
+export interface SelectVersionFailureResponse {
+  /**
+   * The `code` **may** be one of `SelectVersionFailureCode`. Be aware that new
+   * codes can be added over time.
+   */
+  code: number;
+  /** A simplified explanation of why no ZLS build could be selected */
+  message: string;
+}
+
+/**
+ * See `selectZLSVersionFailureCodeToString` for how these codes are converted to messages.
+ *
+ * KEEP IN SYNC WITH README.md
+ */
+export enum SelectVersionFailureCode {
+  /**
+   * This error *should* only occur when specifying a very old Zig version like
+   * `0.8.0`. Please open an issue when encounting this error on recent Zig
+   * versions.
+   */
+  Unsupported = 0,
+  /**
+   * The most common scenario for this error is after Zig has tagged a new
+   * release but ZLS hasn't updated yet.
+   *
+   * Let's say that Zig `0.12.0` has been released but ZLS not yet released ZLS
+   * `0.12.0`. ZLS's latest build is therefore a `0.12.0-dev` build.
+   * A request with `?zig_version=0.13.0-dev` will error because there is no ZLS
+   * `0.12.*` or ZLS `0.13.0-dev` builds.
+   *
+   * Version Order Guide: `0.12.0-dev` < `0.12.0` < `0.13.0-dev` < `0.13.0`
+   *
+   * This error only occurs on development/nightly builds of Zig.
+   */
+  DevelopmentBuildUnsupported = 1,
+  /**
+   * The version selection algorithm has identified the given Zig version as
+   * incompatible with any available ZLS build. When encountering this error on
+   * the latest Zig master version, it usually means that a breaking change
+   * occured that needs ZLS to be updated.
+   *
+   * This error only occurs on development/nightly builds of Zig.
+   */
+  DevelopmentBuildIncompatible = 2,
+  /**
+   * This error only occurs on tagged releases of Zig.
+   */
+  TaggedReleaseIncompatible = 3,
+}
+
+function selectZLSVersionFailureCodeToString(
+  code: SelectVersionFailureCode,
+  zigVersion: SemanticVersion,
+): string {
+  switch (code) {
+    case SelectVersionFailureCode.Unsupported:
+      return `Zig ${zigVersion.toString()} is not supported by ZLS`;
+    case SelectVersionFailureCode.DevelopmentBuildUnsupported:
+      return `No builds for the ${zigVersion.major.toString()}.${zigVersion.minor.toString()} release cycle are available`;
+    case SelectVersionFailureCode.DevelopmentBuildIncompatible:
+      return `Zig ${zigVersion.toString()} has no compatible ZLS build (yet)`;
+    case SelectVersionFailureCode.TaggedReleaseIncompatible:
+      return `ZLS ${zigVersion.major.toString()}.${zigVersion.minor.toString()}.* does not exist (yet)`;
+  }
+}
 
 /**
  * Similar to https://ziglang.org/download/index.json
  */
-export type SelectZLSVersionWithoutZigVersionResponse = Record<
+export type ZLSIndexResponse = Record<
   string,
   {
     /** `YYYY-MM-DD` */
@@ -44,7 +109,13 @@ function artifactsToRecord(
   assert(artifacts.length !== 0);
   const targets: Record<string, ArtifactEntry> = {};
   for (const artifact of artifacts) {
-    if (artifact.extension === "tar.gz") continue;
+    switch (artifact.extension) {
+      case "tar.gz":
+        continue;
+      case "tar.xz":
+      case "zip":
+        break;
+    }
     assert(!(`${artifact.arch}-${artifact.os}` in targets));
     targets[`${artifact.arch}-${artifact.os}`] = {
       tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
@@ -55,21 +126,28 @@ function artifactsToRecord(
   return targets;
 }
 
+function failure(status: number, message: string): Response {
+  return Response.json(
+    {
+      error: message,
+    },
+    {
+      status: status,
+    },
+  );
+}
+
 /** `${ENDPOINT}/zls/index.json` */
 export async function handleZLSIndex(
   request: Request,
   env: Env,
 ): Promise<Response> {
   if (request.method !== "GET") {
-    return new Response("method must be 'GET'", {
-      status: 405, // Method Not Allowed
-    });
+    return failure(405, "method must be 'GET'"); // Method Not Allowed
   }
 
   if (typeof env.R2_PUBLIC_URL !== "string" || !env.R2_PUBLIC_URL) {
-    return new Response(null, {
-      status: 500, // Internal Server Error
-    });
+    return failure(500, "Internal Server Error"); // Internal Server Error
   }
 
   // update the "explain query plan when searching all tagged releases" test when modifying the query
@@ -77,7 +155,7 @@ export async function handleZLSIndex(
     "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
   ).all<{ JsonData: string }>();
 
-  const response: SelectZLSVersionWithoutZigVersionResponse = {};
+  const response: ZLSIndexResponse = {};
 
   for (const entry of result.results) {
     const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
@@ -100,15 +178,11 @@ export async function handleSelectVersion(
   env: Env,
 ): Promise<Response> {
   if (request.method !== "GET") {
-    return new Response("method must be 'GET'", {
-      status: 405, // Method Not Allowed
-    });
+    return failure(405, "method must be 'GET'"); // Method Not Allowed
   }
 
   if (typeof env.R2_PUBLIC_URL !== "string" || !env.R2_PUBLIC_URL) {
-    return new Response(null, {
-      status: 500, // Internal Server Error
-    });
+    return failure(500, "Internal Server Error"); // Internal Server Error
   }
 
   const url = new URL(request.url);
@@ -116,19 +190,15 @@ export async function handleSelectVersion(
   const zigVersionString = url.searchParams.get("zig_version");
 
   if (zigVersionString === null) {
-    return new Response(`Expected query component 'zig_version'!`, {
-      status: 400, // Bad Request
-    });
+    return failure(400, `Expected query component 'zig_version'!`); // Bad Request
   }
 
   const zigVersion = SemanticVersion.parse(zigVersionString);
 
   if (zigVersion === null) {
-    return new Response(
+    return failure(
+      400, // Bad Request
       `Query component 'zig_version' with value '${zigVersionString}' is not a valid version!`,
-      {
-        status: 400, // Bad Request
-      },
     );
   }
 
@@ -137,32 +207,33 @@ export async function handleSelectVersion(
   ) as VersionCompatibility | null;
 
   if (compatibility === null) {
-    return new Response(`Expected query component 'compatibility'!`, {
-      status: 400, // Bad Request
-    });
+    return failure(400, `Expected query component 'compatibility'!`); // Bad Request
   }
 
   assert(Object.values(VersionCompatibility)[0] === VersionCompatibility.None);
   const validCompatibilityValues = Object.values(VersionCompatibility).slice(1);
   if (!validCompatibilityValues.includes(compatibility)) {
-    return new Response(
+    return failure(
+      400, // Bad Request
       `form item 'compatibility' with value '${compatibility}' must be one of ${JSON.stringify(validCompatibilityValues)}!`,
-      {
-        status: 400, // Bad Request
-      },
     );
   }
-  assert(compatibility != VersionCompatibility.None);
+  assert(compatibility !== VersionCompatibility.None);
 
-  const selectedVersion = zigVersion.isRelease
+  const result = zigVersion.isRelease
     ? await selectOnTaggedRelease(env, zigVersion)
     : await selectOnDevelopmentBuild(env, zigVersion, compatibility);
 
-  let response: SelectZLSVersionWithZigVersionResponse;
+  let response: SelectVersionResponse | SelectVersionFailureResponse;
 
-  if ("error" in selectedVersion) {
-    response = selectedVersion;
+  if (typeof result === "number") {
+    const code: SelectVersionFailureCode = result;
+    response = {
+      code: code,
+      message: selectZLSVersionFailureCodeToString(code, zigVersion),
+    };
   } else {
+    const selectedVersion: D2JsonData = result;
     response = {
       version: selectedVersion.zlsVersion,
       date: new Date(selectedVersion.date).toISOString().slice(0, 10),
@@ -182,7 +253,7 @@ export async function handleSelectVersion(
 async function selectOnTaggedRelease(
   env: Env,
   zigVersion: SemanticVersion,
-): Promise<D2JsonData | { error: string }> {
+): Promise<D2JsonData | SelectVersionFailureCode> {
   assert(zigVersion.isRelease);
 
   // update the "explain query plan when searching on tagged release (sorted)" test when modifying the query
@@ -192,11 +263,8 @@ async function selectOnTaggedRelease(
     .bind(zigVersion.major, zigVersion.minor)
     .first<{ JsonData: string }>();
 
-  if (selectedRelease === null) {
-    return {
-      error: `ZLS ${zigVersion.major.toString()}.${zigVersion.minor.toString()}.* does not exist!`,
-    };
-  }
+  if (selectedRelease === null)
+    return SelectVersionFailureCode.TaggedReleaseIncompatible;
 
   return JSON.parse(selectedRelease.JsonData) as D2JsonData;
 }
@@ -270,7 +338,7 @@ async function selectOnDevelopmentBuild(
   env: Env,
   zigVersion: SemanticVersion,
   compatibility: Exclude<VersionCompatibility, VersionCompatibility.None>,
-): Promise<D2JsonData | { error: string }> {
+): Promise<D2JsonData | SelectVersionFailureCode> {
   assert(!zigVersion.isRelease);
 
   const [developmentReleases, taggedReleases] = await env.ZIGTOOLS_DB.batch<{
@@ -290,9 +358,7 @@ async function selectOnDevelopmentBuild(
   const releases = taggedReleases.results.concat(developmentReleases.results);
 
   if (releases.length === 0) {
-    return {
-      error: `No builds for the ${zigVersion.major.toString()}.${zigVersion.minor.toString()} release cycle are available`,
-    };
+    return SelectVersionFailureCode.DevelopmentBuildUnsupported;
   }
 
   const oldestRelease = releases[0];
@@ -306,12 +372,12 @@ async function selectOnDevelopmentBuild(
     SemanticVersion.order(zigVersion, oldestReleaseMinimumRuntimeZigVersion) ==
     Order.lt
   ) {
-    return {
-      error: `Zig ${zigVersion.toString()} is not supported by ZLS`,
-    };
+    return SelectVersionFailureCode.Unsupported;
   }
 
-  // The following algorithm assumes that the Zig version and tested Zig versions are monotonically increasing when iterating over ordered ZLS versions.
+  // The following algorithm assumes that the Zig version and tested Zig
+  // versions are monotonically increasing when iterating over ordered ZLS
+  // versions.
 
   let selectedEntry: D2JsonData = oldestReleaseData;
 
@@ -325,7 +391,8 @@ async function selectOnDevelopmentBuild(
 
     switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
       case Order.lt:
-        // the minimum build version may not be monotonically increasing (i.e a newer release has lower minimum build version) so keep searching
+        // the minimum build version may not be monotonically increasing (i.e a
+        // newer release has lower minimum build version) so keep searching
         continue;
       case Order.eq:
       case Order.gt:
@@ -372,9 +439,7 @@ async function selectOnDevelopmentBuild(
   assert(testedZigVersions.length !== 0);
 
   if (isVersionEnclosedInFailure(testedZigVersions, zigVersion)) {
-    return {
-      error: `Zig ${zigVersion.toString()} has no compatible ZLS build (yet)`,
-    };
+    return SelectVersionFailureCode.DevelopmentBuildIncompatible;
   }
 
   return selectedEntry;

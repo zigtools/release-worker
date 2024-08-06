@@ -15,7 +15,7 @@ The `compatibility` query-string must be either `only-runtime` or `full`:
 - `only-runtime`: Request a ZLS build that can be used at runtime with the given Zig version but may not be able to build ZLS from source.
 
 <details>
-  <summary>Example 1</summary>
+  <summary>Example</summary>
   
   ```bash
   curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.13.0-dev.7%2B73c6c13a&compatibility=only-runtime" # 0.13.0-dev.7+73c6c13a
@@ -70,21 +70,81 @@ The `compatibility` query-string must be either `only-runtime` or `full`:
   
 </details>
 
-<details>
-  <summary>Example 2</summary>
-  
-  ```bash
-  curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.30.0"
-  ```
-  
-  ```json
-  {
-    "error": "ZLS 0.30.* does not exist!"
-  }
-  ```
-  
-</details>
+### Error Handling
 
+<details>
+  <summary> See Here</summary>
+
+The `/v1/zls/select-version` request may be unable to respond with a compatible Zig version.
+
+If the request is valid but cannot be satified, a JSON response with an `code` and `message` field will be send.
+
+```bash
+curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.30.0"
+```
+
+```json
+{
+  "code": 1,
+  "message": "ZLS 0.30.* does not exist!"
+}
+```
+
+#### Unsupported
+
+This error *should* only occur when specifying a very old Zig version like `0.8.0`. Please open an issue when encounting this error on recent Zig versions.
+
+```json
+{
+  "code": 0,
+  "message": "Zig ${ZIG_VERSION} is not supported by ZLS"
+}
+```
+
+#### Unsupported Release Cycle
+
+The most common scenario for this error is after Zig has tagged a new release but ZLS hasn't updated yet.
+
+Let's say that Zig `0.12.0` has been released but ZLS not yet released ZLS `0.12.0`. ZLS's latest build is therefore a `0.12.0-dev` build.
+A request with `?zig_version=0.13.0-dev` will error because there is no ZLS `0.12.*` or ZLS `0.13.0-dev` builds.
+
+Version Order Guide: `0.12.0-dev` < `0.12.0` < `0.13.0-dev` < `0.13.0`
+  
+```json
+{
+  "code": 1,
+  "message": "No builds for the ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION} release cycle are available"
+}
+```
+
+This error only occurs on development/nightly builds of Zig.
+
+#### Incompatible development build
+
+The version selection algorithm has identified the given Zig version as incompatible with any available ZLS build. When encountering this error on the latest Zig master version, it usually means that a breaking change occured that needs ZLS to be updated.
+
+```json
+{
+  "code": 2,
+  "message": "Zig ${ZIG_VERSION} has no compatible ZLS build (yet)"
+}
+```
+
+This error only occurs on development/nightly builds of Zig.
+
+#### Incompatible tagged release
+
+
+```json
+{
+  "code": 3,
+  "message": "ZLS ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION}.* does not exist (yet)"
+}
+```
+
+This error only occurs on tagged releases of Zig.
+
+</details>
 
 ## /v1/zls/index.json
 

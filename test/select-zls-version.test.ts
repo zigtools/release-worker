@@ -9,8 +9,11 @@ import {
 } from "../src/shared";
 import {
   handleSelectVersion,
-  SelectZLSVersionWithoutZigVersionResponse,
-  SelectZLSVersionWithZigVersionResponse,
+  ZLSIndexResponse,
+  SelectVersionResponse,
+  SelectVersionFailureResponse,
+  SelectVersionFailureCode,
+  handleZLSIndex,
 } from "../src/select-zls-version";
 import { SemanticVersion } from "../src/semantic-version";
 
@@ -173,7 +176,7 @@ async function populateDatabase(): Promise<void> {
 async function selectZLSVersion(
   zigVersion: string,
   compatibility: VersionCompatibility,
-): Promise<SelectZLSVersionWithZigVersionResponse> {
+): Promise<SelectVersionResponse | SelectVersionFailureResponse> {
   assert(compatibility != VersionCompatibility.None);
   const url = new URL("https://example.com/v1/zls/select-version");
   url.searchParams.set("zig_version", zigVersion);
@@ -191,39 +194,37 @@ function shuffleArray(array: unknown[]) {
   }
 }
 
-test("method should be 'GET'", async () => {
-  const response = await SELF.fetch("https://example.com/v1/zls/index.json", {
-    method: "POST",
-  });
-  expect(await response.text()).toBe("method must be 'GET'");
-  expect(response.status).toBe(405);
-  expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
-  expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
-});
-
-test.each<unknown>([null, "", {}, []])(
-  "check for invalid R2_PUBLIC_URL: %j",
-  async (value) => {
-    const response = await handleSelectVersion(
-      new Request("https://example.com/v1/zls/index.json"),
-      {
-        API_TOKEN: env.API_TOKEN,
-        R2_PUBLIC_URL: value as string,
-        ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
-        ZIGTOOLS_DB: env.ZIGTOOLS_DB,
-      },
-    );
-    expect(response.status).toBe(500);
-  },
-);
-
 describe("/v1/zls/index.json", () => {
+  test("method should be 'GET'", async () => {
+    const response = await SELF.fetch("https://example.com/v1/zls/index.json", {
+      method: "POST",
+    });
+    expect(await response.json()).toStrictEqual({
+      error: "method must be 'GET'",
+    });
+    expect(response.status).toBe(405);
+  });
+
+  test.each<unknown>([null, "", {}, []])(
+    "check for invalid R2_PUBLIC_URL: %j",
+    async (value) => {
+      const response = await handleZLSIndex(
+        new Request("https://example.com/v1/zls/index.json"),
+        {
+          API_TOKEN: env.API_TOKEN,
+          R2_PUBLIC_URL: value as string,
+          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
+          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
+        },
+      );
+      expect(response.status).toBe(500);
+    },
+  );
+
   test("search on empty database", async () => {
     const response = await SELF.fetch("https://example.com/v1/zls/index.json");
     expect(await response.json()).toStrictEqual({});
     expect(response.status).toBe(200);
-    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(true);
-    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(true);
   });
 
   describe("test on sample database", () => {
@@ -233,8 +234,7 @@ describe("/v1/zls/index.json", () => {
       const response = await SELF.fetch(
         "https://example.com/v1/zls/index.json",
       );
-      const body =
-        await response.json<SelectZLSVersionWithoutZigVersionResponse>();
+      const body = await response.json<ZLSIndexResponse>();
 
       expect(Object.keys(body)).toStrictEqual([
         "0.13.0",
@@ -318,13 +318,55 @@ describe("/v1/zls/index.json", () => {
 });
 
 describe("/v1/zls/select-version", () => {
+  test("method should be 'GET'", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/zls/select-version",
+      {
+        method: "POST",
+      },
+    );
+    expect(await response.json()).toStrictEqual({
+      error: "method must be 'GET'",
+    });
+    expect(response.status).toBe(405);
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
+  });
+
+  test.each<unknown>([null, "", {}, []])(
+    "check for invalid R2_PUBLIC_URL: %j",
+    async (value) => {
+      const response = await handleSelectVersion(
+        new Request("https://example.com/v1/zls/select-version"),
+        {
+          API_TOKEN: env.API_TOKEN,
+          R2_PUBLIC_URL: value as string,
+          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
+          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
+        },
+      );
+      expect(response.status).toBe(500);
+    },
+  );
+
+  test("missing zig version query", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/zls/select-version",
+    );
+    expect(await response.json()).toStrictEqual({
+      error: "Expected query component 'zig_version'!",
+    });
+    expect(response.status).toBe(400);
+  });
+
   test("invalid zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/zls/select-version?zig_version=foo",
     );
-    expect(await response.text()).toBe(
-      "Query component 'zig_version' with value 'foo' is not a valid version!",
-    );
+    expect(await response.json()).toStrictEqual({
+      error:
+        "Query component 'zig_version' with value 'foo' is not a valid version!",
+    });
     expect(response.status).toBe(400);
   });
 
@@ -332,9 +374,9 @@ describe("/v1/zls/select-version", () => {
     const response = await SELF.fetch(
       "https://example.com/v1/zls/select-version?zig_version=0.11.0",
     );
-    expect(await response.text()).toBe(
-      "Expected query component 'compatibility'!",
-    );
+    expect(await response.json()).toStrictEqual({
+      error: "Expected query component 'compatibility'!",
+    });
     expect(response.status).toBe(400);
   });
 
@@ -344,9 +386,9 @@ describe("/v1/zls/select-version", () => {
       const response = await SELF.fetch(
         `https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=${compatibility}`,
       );
-      expect(await response.text()).toBe(
-        `form item 'compatibility' with value '${compatibility}' must be one of ["only-runtime","full"]!`,
-      );
+      expect(await response.json()).toStrictEqual({
+        error: `form item 'compatibility' with value '${compatibility}' must be one of ["only-runtime","full"]!`,
+      });
       expect(response.status).toBe(400);
     },
   );
@@ -355,8 +397,9 @@ describe("/v1/zls/select-version", () => {
     const response = await SELF.fetch(
       "https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=full",
     );
-    expect(await response.json()).toStrictEqual({
-      error: "ZLS 0.11.* does not exist!",
+    expect(await response.json()).toStrictEqual<SelectVersionFailureResponse>({
+      code: SelectVersionFailureCode.TaggedReleaseIncompatible,
+      message: "ZLS 0.11.* does not exist (yet)",
     });
     expect(response.status).toBe(200);
   });
@@ -369,7 +412,7 @@ describe("/v1/zls/select-version", () => {
         "0.11.0",
         VersionCompatibility.Full,
       );
-      expect(response).toStrictEqual<SelectZLSVersionWithZigVersionResponse>({
+      expect(response).toStrictEqual<SelectVersionResponse>({
         date: "1970-01-01",
         version: "0.11.0",
         "x86_64-linux": {
@@ -434,41 +477,67 @@ describe("/v1/zls/select-version", () => {
         );
         if (expectedZLSVersion === null) {
           expect(response).not.toHaveProperty("version");
-          expect(response).toHaveProperty("error");
+          expect(response).toHaveProperty("code");
+          expect(response).toHaveProperty("message");
         } else {
-          expect(response).not.toHaveProperty("error");
-          assert(!("error" in response));
+          expect(response).not.toHaveProperty("code");
+          assert(!("code" in response));
+          expect(response).not.toHaveProperty("message");
+          assert(!("message" in response));
           expect(response.version).toBe<string>(expectedZLSVersion);
         }
       },
     );
 
-    test.each<[string, string]>([
-      ["0.10.0", "ZLS 0.10.* does not exist!"],
-      ["0.10.1", "ZLS 0.10.* does not exist!"],
-      ["0.15.0", "ZLS 0.15.* does not exist!"],
-      ["0.10.0", "ZLS 0.10.* does not exist!"],
+    test.each<[string, SelectVersionFailureCode, string]>([
+      [
+        "0.10.0",
+        SelectVersionFailureCode.TaggedReleaseIncompatible,
+        "ZLS 0.10.* does not exist (yet)",
+      ],
+      [
+        "0.10.1",
+        SelectVersionFailureCode.TaggedReleaseIncompatible,
+        "ZLS 0.10.* does not exist (yet)",
+      ],
+      [
+        "0.15.0",
+        SelectVersionFailureCode.TaggedReleaseIncompatible,
+        "ZLS 0.15.* does not exist (yet)",
+      ],
+      [
+        "0.10.0",
+        SelectVersionFailureCode.TaggedReleaseIncompatible,
+        "ZLS 0.10.* does not exist (yet)",
+      ],
       [
         "0.10.0-dev.5+aaaaaaaaa",
+        SelectVersionFailureCode.DevelopmentBuildUnsupported,
         "No builds for the 0.10 release cycle are available",
       ],
       [
         "0.9.0-dev.10+aaaaaaaaa",
+        SelectVersionFailureCode.Unsupported,
         "Zig 0.9.0-dev.10+aaaaaaaaa is not supported by ZLS",
       ],
       [
         "0.12.0-dev.13+aaaaaaaaa",
+        SelectVersionFailureCode.DevelopmentBuildIncompatible,
         "Zig 0.12.0-dev.13+aaaaaaaaa has no compatible ZLS build (yet)",
       ],
-    ])("Zig %s should error with '%s'", async (zigVersion, expectedError) => {
-      const response = await selectZLSVersion(
-        zigVersion,
-        VersionCompatibility.Full,
-      );
-      expect(response).toStrictEqual({
-        error: expectedError,
-      });
-    });
+    ])(
+      "Zig %s should error with '%s'",
+      async (zigVersion, expectedCode, expectedError) => {
+        const response = await selectZLSVersion(
+          zigVersion,
+          VersionCompatibility.Full,
+        );
+        expect(response).toStrictEqual<SelectVersionFailureResponse>({
+          code: expectedCode,
+          message: expectedError,
+        });
+      },
+    );
   });
 
   test("explain query plan when searching on tagged release", async () => {
