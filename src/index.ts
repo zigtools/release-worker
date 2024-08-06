@@ -1,6 +1,6 @@
 import { Env } from "./env";
 import { handlePublish } from "./publish";
-import { handleSelectZLSVersion } from "./select-zls-version";
+import { handleSelectVersion, handleZLSIndex } from "./select-zls-version";
 
 export default {
   async fetch(request, env, _ctx) {
@@ -9,10 +9,13 @@ export default {
     let response: Response;
     const url = new URL(request.url);
     switch (url.pathname) {
-      case "/v1/select-zls-version":
-        response = await handleSelectZLSVersion(request, env);
+      case "/v1/zls/select-version":
+        response = await handleSelectVersion(request, env);
         break;
-      case "/publish":
+      case "/v1/zls/index.json":
+        response = await handleZLSIndex(request, env);
+        break;
+      case "/v1/zls/publish":
         response = await handlePublish(request, env);
         break;
       default:

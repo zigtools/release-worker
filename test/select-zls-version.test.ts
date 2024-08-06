@@ -8,7 +8,7 @@ import {
   VersionCompatibility,
 } from "../src/shared";
 import {
-  handleSelectZLSVersion,
+  handleSelectVersion,
   SelectZLSVersionWithoutZigVersionResponse,
   SelectZLSVersionWithZigVersionResponse,
 } from "../src/select-zls-version";
@@ -149,12 +149,33 @@ const samples: D2JsonData[] = [
   },
 ];
 
+async function populateDatabase(): Promise<void> {
+  shuffleArray(samples);
+  const statements = samples.map((sample) => {
+    const zlsVersion = SemanticVersion.parse(sample.zlsVersion);
+    assert(zlsVersion !== null);
+
+    return env.ZIGTOOLS_DB.prepare(
+      "INSERT INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
+    ).bind(
+      sample.zlsVersion satisfies string,
+      zlsVersion.major satisfies number,
+      zlsVersion.minor satisfies number,
+      zlsVersion.patch satisfies number,
+      (zlsVersion.commitHeight ?? null) satisfies number | null,
+      zlsVersion.isRelease satisfies boolean,
+      JSON.stringify(sample satisfies D2JsonData),
+    );
+  });
+  await env.ZIGTOOLS_DB.batch(statements);
+}
+
 async function selectZLSVersion(
   zigVersion: string,
   compatibility: VersionCompatibility,
 ): Promise<SelectZLSVersionWithZigVersionResponse> {
   assert(compatibility != VersionCompatibility.None);
-  const url = new URL("https://example.com/v1/select-zls-version");
+  const url = new URL("https://example.com/v1/zls/select-version");
   url.searchParams.set("zig_version", zigVersion);
   url.searchParams.set("compatibility", compatibility);
 
@@ -170,114 +191,47 @@ function shuffleArray(array: unknown[]) {
   }
 }
 
-describe("/v1/select-zls-version", () => {
-  test("method should be 'GET'", async () => {
-    const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version",
+test("method should be 'GET'", async () => {
+  const response = await SELF.fetch("https://example.com/v1/zls/index.json", {
+    method: "POST",
+  });
+  expect(await response.text()).toBe("method must be 'GET'");
+  expect(response.status).toBe(405);
+  expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+  expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
+});
+
+test.each<unknown>([null, "", {}, []])(
+  "check for invalid R2_PUBLIC_URL: %j",
+  async (value) => {
+    const response = await handleSelectVersion(
+      new Request("https://example.com/v1/zls/index.json"),
       {
-        method: "POST",
+        API_TOKEN: env.API_TOKEN,
+        R2_PUBLIC_URL: value as string,
+        ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
+        ZIGTOOLS_DB: env.ZIGTOOLS_DB,
       },
     );
-    expect(await response.text()).toBe("method must be 'GET'");
-    expect(response.status).toBe(405);
-    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
-    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
-  });
+    expect(response.status).toBe(500);
+  },
+);
 
-  test.each<unknown>([null, "", {}, []])(
-    "check for invalid R2_PUBLIC_URL: %j",
-    async (value) => {
-      const response = await handleSelectZLSVersion(
-        new Request("https://example.com/v1/select-zls-version"),
-        {
-          API_TOKEN: env.API_TOKEN,
-          R2_PUBLIC_URL: value as string,
-          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
-          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
-        },
-      );
-      expect(response.status).toBe(500);
-    },
-  );
-
-  test("invalid zig version", async () => {
-    const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version?zig_version=foo",
-    );
-    expect(await response.text()).toBe(
-      "Query component 'zig_version' with value 'foo' is not a valid version!",
-    );
-    expect(response.status).toBe(400);
-  });
-
-  test("missing compatibility query", async () => {
-    const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version?zig_version=0.11.0",
-    );
-    expect(await response.text()).toBe(
-      "Expected query component 'compatibility'!",
-    );
-    expect(response.status).toBe(400);
-  });
-
-  test.each<string>(["", "foo", "none", "None", "OnlyRuntime", "Full"])(
-    "invalid compatibility string: '%s'",
-    async (compatibility) => {
-      const response = await SELF.fetch(
-        `https://example.com/v1/select-zls-version?zig_version=0.11.0&compatibility=${compatibility}`,
-      );
-      expect(await response.text()).toBe(
-        `form item 'compatibility' with value '${compatibility}' must be one of ["only-runtime","full"]!`,
-      );
-      expect(response.status).toBe(400);
-    },
-  );
-
+describe("/v1/zls/index.json", () => {
   test("search on empty database", async () => {
-    const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version",
-    );
+    const response = await SELF.fetch("https://example.com/v1/zls/index.json");
     expect(await response.json()).toStrictEqual({});
     expect(response.status).toBe(200);
     expect(response.headers.has("Access-Control-Allow-Origin")).toBe(true);
     expect(response.headers.has("Access-Control-Allow-Methods")).toBe(true);
   });
 
-  test("search on empty database with Zig version", async () => {
-    const response = await SELF.fetch(
-      "https://example.com/v1/select-zls-version?zig_version=0.11.0&compatibility=full",
-    );
-    expect(await response.json()).toStrictEqual({
-      error: "ZLS 0.11.* does not exist!",
-    });
-    expect(response.status).toBe(200);
-  });
-
   describe("test on sample database", () => {
-    beforeEach(async () => {
-      shuffleArray(samples);
-      const statements = samples.map((sample) => {
-        const zlsVersion = SemanticVersion.parse(sample.zlsVersion);
-        assert(zlsVersion !== null);
-
-        return env.ZIGTOOLS_DB.prepare(
-          "INSERT INTO ZLSReleases VALUES (?1, ?2, ?3, ?4, ?5, ?6, json(?7))",
-        ).bind(
-          sample.zlsVersion satisfies string,
-          zlsVersion.major satisfies number,
-          zlsVersion.minor satisfies number,
-          zlsVersion.patch satisfies number,
-          (zlsVersion.commitHeight ?? null) satisfies number | null,
-          zlsVersion.isRelease satisfies boolean,
-          JSON.stringify(sample satisfies D2JsonData),
-        );
-      });
-      await env.ZIGTOOLS_DB.batch(statements);
-    });
+    beforeEach(populateDatabase);
 
     test("search without version", async () => {
       const response = await SELF.fetch(
-        "https://example.com/v1/select-zls-version",
+        "https://example.com/v1/zls/index.json",
       );
       const body =
         await response.json<SelectZLSVersionWithoutZigVersionResponse>();
@@ -344,6 +298,71 @@ describe("/v1/select-zls-version", () => {
       });
       expect(response.status).toBe(200);
     });
+  });
+
+  test("explain query plan when searching all tagged releases", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+    ).all<SQLiteQueryPlanRow>();
+
+    // TODO test `response.meta.rows_read` on an example database
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=?)",
+      },
+    ]);
+  });
+});
+
+describe("/v1/zls/select-version", () => {
+  test("invalid zig version", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/zls/select-version?zig_version=foo",
+    );
+    expect(await response.text()).toBe(
+      "Query component 'zig_version' with value 'foo' is not a valid version!",
+    );
+    expect(response.status).toBe(400);
+  });
+
+  test("missing compatibility query", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/zls/select-version?zig_version=0.11.0",
+    );
+    expect(await response.text()).toBe(
+      "Expected query component 'compatibility'!",
+    );
+    expect(response.status).toBe(400);
+  });
+
+  test.each<string>(["", "foo", "none", "None", "OnlyRuntime", "Full"])(
+    "invalid compatibility string: '%s'",
+    async (compatibility) => {
+      const response = await SELF.fetch(
+        `https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=${compatibility}`,
+      );
+      expect(await response.text()).toBe(
+        `form item 'compatibility' with value '${compatibility}' must be one of ["only-runtime","full"]!`,
+      );
+      expect(response.status).toBe(400);
+    },
+  );
+
+  test("search on empty database with Zig version", async () => {
+    const response = await SELF.fetch(
+      "https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=full",
+    );
+    expect(await response.json()).toStrictEqual({
+      error: "ZLS 0.11.* does not exist!",
+    });
+    expect(response.status).toBe(200);
+  });
+
+  describe("test on sample database", () => {
+    beforeEach(populateDatabase);
 
     test("search for with Version 0.11.0", async () => {
       const response = await selectZLSVersion(
@@ -450,22 +469,6 @@ describe("/v1/select-zls-version", () => {
         error: expectedError,
       });
     });
-  });
-
-  test("explain query plan when searching all tagged releases", async () => {
-    const response = await env.ZIGTOOLS_DB.prepare(
-      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-    ).all<SQLiteQueryPlanRow>();
-
-    // TODO test `response.meta.rows_read` on an example database
-
-    expect(response.results).toMatchObject([
-      {
-        notused: 0,
-        detail:
-          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=?)",
-      },
-    ]);
   });
 
   test("explain query plan when searching on tagged release", async () => {

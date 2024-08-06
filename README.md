@@ -4,10 +4,7 @@ A Cloudflare Worker for managing ZLS build artifacts.
 
 The API Endpoint is `releases.zigtools.org`.
 
-## /v1/select-zls-version?zig_version=${VERSION}&compatibility=${COMPATIBILITY}
-
-> [!IMPORTANT]
-> If you are developing a tool that automatically installs ZLS then you came to the right place!
+## /v1/zls/select-version?zig_version=${VERSION}&compatibility=${COMPATIBILITY}
 
 Will respond with metadata about a ZLS build that is useable with the given Zig version.
 The response body is similar to Zig's [index.json](https://ziglang.org/download/index.json).
@@ -21,7 +18,7 @@ The `compatibility` query-string must be either `only-runtime` or `full`:
   <summary>Example 1</summary>
   
   ```bash
-  curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.13.0-dev.7%2B73c6c13a&compatibility=only-runtime" # 0.13.0-dev.7+73c6c13a
+  curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.13.0-dev.7%2B73c6c13a&compatibility=only-runtime" # 0.13.0-dev.7+73c6c13a
   ```
   
   ```json
@@ -77,7 +74,7 @@ The `compatibility` query-string must be either `only-runtime` or `full`:
   <summary>Example 2</summary>
   
   ```bash
-  curl "https://releases.zigtools.org/v1/select-zls-version?zig_version=0.30.0"
+  curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.30.0"
   ```
   
   ```json
@@ -88,7 +85,8 @@ The `compatibility` query-string must be either `only-runtime` or `full`:
   
 </details>
 
-## /v1/select-zls-version
+
+## /v1/zls/index.json
 
 The response body imitates Zig's [index.json](https://ziglang.org/download/index.json) except that there is no field for `master`. Development builds of ZLS should be queried by supplying the Zig version that is being used.
 
@@ -96,7 +94,7 @@ The response body imitates Zig's [index.json](https://ziglang.org/download/index
   <summary>Show Example</summary>
   
   ```bash
-  curl "https://releases.zigtools.org/v1/select-zls-version"
+  curl "https://releases.zigtools.org/v1/zls/index.json"
   ```
   
   ```json
@@ -230,7 +228,7 @@ The response body imitates Zig's [index.json](https://ziglang.org/download/index
   
 </details>
 
-## /publish
+## /zls/publish
 
 > [!IMPORTANT]
 > This request is only intended to be used by ZLS's GitHub CI.

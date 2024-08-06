@@ -55,11 +55,47 @@ function artifactsToRecord(
   return targets;
 }
 
-/**
- * - `${ENDPOINT}/select-zls-version`
- * - `${ENDPOINT}/select-zls-version?zig_version=0.12.0&compatibility=full`
- */
-export async function handleSelectZLSVersion(
+/** `${ENDPOINT}/zls/index.json` */
+export async function handleZLSIndex(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response("method must be 'GET'", {
+      status: 405, // Method Not Allowed
+    });
+  }
+
+  if (typeof env.R2_PUBLIC_URL !== "string" || !env.R2_PUBLIC_URL) {
+    return new Response(null, {
+      status: 500, // Internal Server Error
+    });
+  }
+
+  // update the "explain query plan when searching all tagged releases" test when modifying the query
+  const result = await env.ZIGTOOLS_DB.prepare(
+    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+  ).all<{ JsonData: string }>();
+
+  const response: SelectZLSVersionWithoutZigVersionResponse = {};
+
+  for (const entry of result.results) {
+    const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
+    response[jsonData.zlsVersion] = {
+      date: new Date(jsonData.date).toISOString().slice(0, 10),
+      ...artifactsToRecord(env, jsonData.artifacts),
+    };
+  }
+
+  return Response.json(response, {
+    headers: {
+      "cache-control": "max-age=43200", // 12 hours
+    },
+  });
+}
+
+/** `${ENDPOINT}/zls/select-version?zig_version=0.12.0&compatibility=full` */
+export async function handleSelectVersion(
   request: Request,
   env: Env,
 ): Promise<Response> {
@@ -76,28 +112,12 @@ export async function handleSelectZLSVersion(
   }
 
   const url = new URL(request.url);
+
   const zigVersionString = url.searchParams.get("zig_version");
 
   if (zigVersionString === null) {
-    // update the "explain query plan when searching all tagged releases" test when modifying the query
-    const result = await env.ZIGTOOLS_DB.prepare(
-      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-    ).all<{ JsonData: string }>();
-
-    const response: SelectZLSVersionWithoutZigVersionResponse = {};
-
-    for (const entry of result.results) {
-      const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
-      response[jsonData.zlsVersion] = {
-        date: new Date(jsonData.date).toISOString().slice(0, 10),
-        ...artifactsToRecord(env, jsonData.artifacts),
-      };
-    }
-
-    return Response.json(response, {
-      headers: {
-        "cache-control": "max-age=43200", // 12 hours
-      },
+    return new Response(`Expected query component 'zig_version'!`, {
+      status: 400, // Bad Request
     });
   }
 
