@@ -376,6 +376,15 @@ export async function handlePublish(
   }
 
   if (
+    env.FORCE_MINISIGN !== undefined &&
+    artifactHasMinisign.some((hasMinisign) => !hasMinisign)
+  ) {
+    return new Response(`Every artifact must have a minisign file!`, {
+      status: 400, // Bad Request
+    });
+  }
+
+  if (
     artifactHasMinisign.length !== 0 &&
     !artifactHasMinisign.every((value) => value === artifactHasMinisign[0])
   ) {

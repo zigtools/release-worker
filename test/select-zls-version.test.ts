@@ -214,10 +214,8 @@ describe("/v1/zls/index.json", () => {
       const response = await handleZLSIndex(
         new Request("https://example.com/v1/zls/index.json"),
         {
-          API_TOKEN: env.API_TOKEN,
+          ...env,
           R2_PUBLIC_URL: value as string,
-          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
-          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
         },
       );
       expect(response.status).toBe(500);
@@ -350,10 +348,8 @@ describe("/v1/zls/select-version", () => {
       const response = await handleSelectVersion(
         new Request("https://example.com/v1/zls/select-version"),
         {
-          API_TOKEN: env.API_TOKEN,
+          ...env,
           R2_PUBLIC_URL: value as string,
-          ZIGTOOLS_BUILDS: env.ZIGTOOLS_BUILDS,
-          ZIGTOOLS_DB: env.ZIGTOOLS_DB,
         },
       );
       expect(response.status).toBe(500);
