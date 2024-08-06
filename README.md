@@ -80,19 +80,19 @@ The `/v1/zls/select-version` request may be unable to respond with a compatible 
 If the request is valid but cannot be satified, a JSON response with an `code` and `message` field will be send.
 
 ```bash
-curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.30.0"
+curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.30.0&compatibility=full"
 ```
 
 ```json
 {
   "code": 1,
-  "message": "ZLS 0.30.* does not exist!"
+  "message": "ZLS 0.30.* does not exist (yet)"
 }
 ```
 
 #### Unsupported
 
-This error *should* only occur when specifying a very old Zig version like `0.8.0`. Please open an issue when encounting this error on recent Zig versions.
+This error _should_ only occur when specifying a very old Zig version like `0.8.0`. Please open an issue when encounting this error on recent Zig versions.
 
 ```json
 {
@@ -109,7 +109,7 @@ Let's say that Zig `0.12.0` has been released but ZLS not yet released ZLS `0.12
 A request with `?zig_version=0.13.0-dev` will error because there is no ZLS `0.12.*` or ZLS `0.13.0-dev` builds.
 
 Version Order Guide: `0.12.0-dev` < `0.12.0` < `0.13.0-dev` < `0.13.0`
-  
+
 ```json
 {
   "code": 1,
@@ -133,7 +133,6 @@ The version selection algorithm has identified the given Zig version as incompat
 This error only occurs on development/nightly builds of Zig.
 
 #### Incompatible tagged release
-
 
 ```json
 {
