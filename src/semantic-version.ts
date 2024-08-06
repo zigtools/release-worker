@@ -21,7 +21,7 @@ export class SemanticVersion {
     /** adapted from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string */
     const regex =
       /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-dev\.(\d+)\+([0-9a-fA-F]{7,9}))?$/;
-    const match = string.match(regex);
+    const match = regex.exec(string);
     if (match === null) return null;
 
     const semver = new SemanticVersion();

@@ -3,9 +3,7 @@ import { handlePublish } from "./publish";
 import { handleSelectZLSVersion } from "./select-zls-version";
 
 export default {
-  async fetch(request, env, ctx) {
-    ctx;
-
+  async fetch(request, env, _ctx) {
     if (request.method === "OPTIONS") return handleOptions(request);
 
     let response: Response;

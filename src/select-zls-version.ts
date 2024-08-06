@@ -280,7 +280,7 @@ async function selectOnDevelopmentBuild(
   const oldestReleaseMinimumRuntimeZigVersion = SemanticVersion.parse(
     oldestReleaseData.minimumRuntimeZigVersion,
   );
-  assert(oldestReleaseMinimumRuntimeZigVersion);
+  assert(oldestReleaseMinimumRuntimeZigVersion !== null);
 
   if (
     SemanticVersion.order(zigVersion, oldestReleaseMinimumRuntimeZigVersion) ==
@@ -300,7 +300,7 @@ async function selectOnDevelopmentBuild(
     const minimumRuntimeZigVersion = SemanticVersion.parse(
       data.minimumRuntimeZigVersion,
     );
-    assert(minimumRuntimeZigVersion);
+    assert(minimumRuntimeZigVersion !== null);
     assert(data.artifacts.length !== 0);
 
     switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {

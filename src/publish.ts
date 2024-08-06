@@ -172,21 +172,18 @@ export async function handlePublish(
 
   const [
     minBuildZigVersionString,
-    minBuildZigVersion,
+    _minBuildZigVersion,
     minBuildZigVersionResponse,
   ] = expectSemverFormItem(form, "minimum-build-zig-version");
   if (minBuildZigVersionResponse !== null) return minBuildZigVersionResponse;
 
   const [
     minRuntimeZigVersionString,
-    minRuntimeZigVersion,
+    _minRuntimeZigVersion,
     minRuntimeZigVersionResponse,
   ] = expectSemverFormItem(form, "minimum-runtime-zig-version");
   if (minRuntimeZigVersionResponse !== null)
     return minRuntimeZigVersionResponse;
-
-  minBuildZigVersion;
-  minRuntimeZigVersion;
 
   const compatibility = form.get(
     "compatibility",
@@ -267,7 +264,7 @@ export async function handlePublish(
       continue;
     }
 
-    const match = key.match(artifactRegex);
+    const match = artifactRegex.exec(key);
 
     if (match === null) {
       return new Response(`failed to parse artifact '${key}'!`, {
