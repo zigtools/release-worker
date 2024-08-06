@@ -23,7 +23,8 @@ const defaultArtifacts: ReleaseArtifact[] = [
     os: "linux",
     version: "0.11.0",
     extension: "tar.xz",
-    fileShasum: "aaa",
+    fileShasum:
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     fileSize: 12,
   },
   {
@@ -31,7 +32,8 @@ const defaultArtifacts: ReleaseArtifact[] = [
     os: "linux",
     version: "0.11.0",
     extension: "tar.gz",
-    fileShasum: "bbb",
+    fileShasum:
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     fileSize: 12,
   },
   {
@@ -39,7 +41,8 @@ const defaultArtifacts: ReleaseArtifact[] = [
     os: "windows",
     version: "0.11.0",
     extension: "zip",
-    fileShasum: "ccc",
+    fileShasum:
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     fileSize: 12,
   },
 ];
@@ -247,12 +250,14 @@ describe("/v1/zls/index.json", () => {
           date: "1970-01-01",
           "x86_64-linux": {
             tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum: "aaa",
+            shasum:
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             size: "12",
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "ccc",
+            shasum:
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             size: "12",
           },
         },
@@ -260,12 +265,14 @@ describe("/v1/zls/index.json", () => {
           date: "1970-01-01",
           "x86_64-linux": {
             tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum: "aaa",
+            shasum:
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             size: "12",
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "ccc",
+            shasum:
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             size: "12",
           },
         },
@@ -273,12 +280,14 @@ describe("/v1/zls/index.json", () => {
           date: "1970-01-01",
           "x86_64-linux": {
             tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum: "aaa",
+            shasum:
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             size: "12",
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "ccc",
+            shasum:
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             size: "12",
           },
         },
@@ -286,12 +295,14 @@ describe("/v1/zls/index.json", () => {
           date: "1970-01-01",
           "x86_64-linux": {
             tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum: "aaa",
+            shasum:
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             size: "12",
           },
           "aarch64-windows": {
             tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum: "ccc",
+            shasum:
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             size: "12",
           },
         },
@@ -417,12 +428,14 @@ describe("/v1/zls/select-version", () => {
         version: "0.11.0",
         "x86_64-linux": {
           tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-          shasum: "aaa",
+          shasum:
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           size: "12",
         },
         "aarch64-windows": {
           tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-          shasum: "ccc",
+          shasum:
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           size: "12",
         },
       });

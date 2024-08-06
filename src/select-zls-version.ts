@@ -117,6 +117,7 @@ function artifactsToRecord(
         break;
     }
     assert(!(`${artifact.arch}-${artifact.os}` in targets));
+    assert.strictEqual(artifact.fileShasum.length, 64);
     targets[`${artifact.arch}-${artifact.os}`] = {
       tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
       shasum: artifact.fileShasum,
