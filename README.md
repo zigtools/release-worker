@@ -323,5 +323,5 @@ npm run dev
 # Publish a ZLS release (Requires `tar` and `7z`)
 git clone https://github.com/zigtools/zls
 cd zls
-ZLS_WORKER_ENDPOINT=http://localhost:8787 zig build release -Drelease-publish=success --summary all
+ZLS_WORKER_ENDPOINT=http://localhost:8787 zig build publish --summary all
 ```
