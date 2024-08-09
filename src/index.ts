@@ -25,16 +25,14 @@ export default {
         break;
     }
 
-    if (response.ok) {
-      response.headers.set(
-        "Access-Control-Allow-Origin",
-        corsHeaders["Access-Control-Allow-Origin"],
-      );
-      response.headers.set(
-        "Access-Control-Allow-Methods",
-        corsHeaders["Access-Control-Allow-Methods"],
-      );
-    }
+    response.headers.set(
+      "Access-Control-Allow-Origin",
+      corsHeaders["Access-Control-Allow-Origin"],
+    );
+    response.headers.set(
+      "Access-Control-Allow-Methods",
+      corsHeaders["Access-Control-Allow-Methods"],
+    );
 
     return response;
   },

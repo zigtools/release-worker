@@ -338,8 +338,6 @@ describe("/v1/zls/select-version", () => {
       error: "method must be 'GET'",
     });
     expect(response.status).toBe(405);
-    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
-    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
   });
 
   test.each<unknown>([null, "", {}, []])(

@@ -4,7 +4,10 @@ import { test, expect } from "vitest";
 test("unknown URL path", async () => {
   const response = await SELF.fetch("https://example.com/unknown", {});
   expect(response.status).toBe(404);
-  expect(Object.fromEntries(response.headers.entries())).toStrictEqual({});
+  expect(Object.fromEntries(response.headers.entries())).toStrictEqual({
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET,HEAD,POST,OPTIONS",
+  });
 });
 
 test("standard OPTIONS request", async () => {
