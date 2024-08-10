@@ -279,10 +279,6 @@ export async function handlePublish(
 
     assert.strictEqual(key, `zls-${os}-${arch}-${version}.${extension}`);
 
-    // console.log(
-    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${file_hash.digest("hex")}, size=${value.size.toString()}`,
-    // );
-
     if (SemanticVersion.parse(version) === null) {
       return new Response(
         `artifact '${key}' has an invalid version '${version}'!`,
@@ -294,6 +290,7 @@ export async function handlePublish(
 
     const fileHash = createHash("sha256");
     await pipeline(file.stream(), fileHash);
+    const fileShasum = fileHash.digest("hex");
 
     const expectedMagicNumber = getMagicNumberOfExtension(extension);
     const actualMagicNumber: Uint8Array = new Uint8Array(
@@ -309,6 +306,10 @@ export async function handlePublish(
       );
     }
 
+    // console.log(
+    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${fileShasum}, size=${file.size.toString()}`,
+    // );
+
     artifactFiles.push(file);
 
     artifacts.push({
@@ -316,7 +317,7 @@ export async function handlePublish(
       arch: arch,
       version: version,
       extension: extension,
-      fileShasum: fileHash.digest("hex"),
+      fileShasum: fileShasum,
       fileSize: file.size,
     });
   }
