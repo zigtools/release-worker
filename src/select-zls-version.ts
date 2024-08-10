@@ -177,7 +177,7 @@ export async function handleZLSIndex(
 
   return Response.json(response, {
     headers: {
-      "cache-control": "max-age=43200", // 12 hours
+      "cache-control": "public, max-age=3600", // 1 hour
     },
   });
 }
@@ -254,8 +254,8 @@ export async function handleSelectVersion(
   return Response.json(response, {
     headers: {
       "cache-control": zigVersion.isRelease
-        ? "max-age=43200" // 12 hours
-        : "max-age=600", // 10 minutes
+        ? "public, max-age=3600" // 1 hour
+        : "public, max-age=300", // 5 minutes
     },
   });
 }
