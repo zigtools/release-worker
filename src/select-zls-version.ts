@@ -138,6 +138,18 @@ function failure(status: number, message: string): Response {
   );
 }
 
+/** The versions are sorted in ascending order */
+async function queryAllTaggedReleases(
+  env: Env,
+): Promise<{ JsonData: string }[]> {
+  // update the "explain query plan when searching all tagged releases" test when modifying the query
+  return (
+    await env.ZIGTOOLS_DB.prepare(
+      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+    ).all<{ JsonData: string }>()
+  ).results;
+}
+
 /** `${ENDPOINT}/zls/index.json` */
 export async function handleZLSIndex(
   request: Request,
@@ -151,14 +163,11 @@ export async function handleZLSIndex(
     return failure(500, "Internal Server Error"); // Internal Server Error
   }
 
-  // update the "explain query plan when searching all tagged releases" test when modifying the query
-  const result = await env.ZIGTOOLS_DB.prepare(
-    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-  ).all<{ JsonData: string }>();
+  const releases = await queryAllTaggedReleases(env);
 
   const response: ZLSIndexResponse = {};
 
-  for (const entry of result.results) {
+  for (const entry of releases) {
     const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
     response[jsonData.zlsVersion] = {
       date: new Date(jsonData.date).toISOString().slice(0, 10),
@@ -264,10 +273,28 @@ async function selectOnTaggedRelease(
     .bind(zigVersion.major, zigVersion.minor)
     .first<{ JsonData: string }>();
 
-  if (selectedRelease === null)
-    return SelectVersionFailureCode.TaggedReleaseIncompatible;
+  if (selectedRelease !== null) {
+    return JSON.parse(selectedRelease.JsonData) as D2JsonData;
+  }
 
-  return JSON.parse(selectedRelease.JsonData) as D2JsonData;
+  // If the version is older than the oldest available tagged release then the version is declared unsupported.
+  const releases = await queryAllTaggedReleases(env);
+
+  if (releases.length !== 0) {
+    const oldest = JSON.parse(releases[0].JsonData) as D2JsonData;
+    const oldestMinRuntimeZigVersion = SemanticVersion.parse(
+      oldest.minimumRuntimeZigVersion,
+    );
+    assert(oldestMinRuntimeZigVersion !== null);
+
+    if (
+      SemanticVersion.order(zigVersion, oldestMinRuntimeZigVersion) == Order.lt
+    ) {
+      return SelectVersionFailureCode.Unsupported;
+    }
+  }
+
+  return SelectVersionFailureCode.TaggedReleaseIncompatible;
 }
 
 function isVersionEnclosedInFailure(
@@ -362,16 +389,14 @@ async function selectOnDevelopmentBuild(
     return SelectVersionFailureCode.DevelopmentBuildUnsupported;
   }
 
-  const oldestRelease = releases[0];
-  const oldestReleaseData = JSON.parse(oldestRelease.JsonData) as D2JsonData;
-  const oldestReleaseMinimumRuntimeZigVersion = SemanticVersion.parse(
-    oldestReleaseData.minimumRuntimeZigVersion,
+  const oldestRelease = JSON.parse(releases[0].JsonData) as D2JsonData;
+  const oldestMinRuntimeZigVersion = SemanticVersion.parse(
+    oldestRelease.minimumRuntimeZigVersion,
   );
-  assert(oldestReleaseMinimumRuntimeZigVersion !== null);
+  assert(oldestMinRuntimeZigVersion !== null);
 
   if (
-    SemanticVersion.order(zigVersion, oldestReleaseMinimumRuntimeZigVersion) ==
-    Order.lt
+    SemanticVersion.order(zigVersion, oldestMinRuntimeZigVersion) == Order.lt
   ) {
     return SelectVersionFailureCode.Unsupported;
   }
@@ -380,7 +405,7 @@ async function selectOnDevelopmentBuild(
   // versions are monotonically increasing when iterating over ordered ZLS
   // versions.
 
-  let selectedEntry: D2JsonData = oldestReleaseData;
+  let selectedEntry: D2JsonData = oldestRelease;
 
   for (const entry of releases) {
     const data = JSON.parse(entry.JsonData) as D2JsonData;

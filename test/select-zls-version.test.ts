@@ -499,23 +499,18 @@ describe("/v1/zls/select-version", () => {
     test.each<[string, SelectVersionFailureCode, string]>([
       [
         "0.10.0",
-        SelectVersionFailureCode.TaggedReleaseIncompatible,
-        "ZLS 0.10.* does not exist (yet)",
+        SelectVersionFailureCode.Unsupported,
+        "Zig 0.10.0 is not supported by ZLS",
       ],
       [
         "0.10.1",
-        SelectVersionFailureCode.TaggedReleaseIncompatible,
-        "ZLS 0.10.* does not exist (yet)",
+        SelectVersionFailureCode.Unsupported,
+        "Zig 0.10.1 is not supported by ZLS",
       ],
       [
         "0.15.0",
         SelectVersionFailureCode.TaggedReleaseIncompatible,
         "ZLS 0.15.* does not exist (yet)",
-      ],
-      [
-        "0.10.0",
-        SelectVersionFailureCode.TaggedReleaseIncompatible,
-        "ZLS 0.10.* does not exist (yet)",
       ],
       [
         "0.10.0-dev.5+aaaaaaaaa",
