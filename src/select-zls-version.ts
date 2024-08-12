@@ -73,7 +73,7 @@ function selectZLSVersionFailureCodeToString(
     case SelectVersionFailureCode.Unsupported:
       return `Zig ${zigVersion.toString()} is not supported by ZLS`;
     case SelectVersionFailureCode.DevelopmentBuildUnsupported:
-      return `No builds for the ${zigVersion.major.toString()}.${zigVersion.minor.toString()} release cycle are available`;
+      return `No builds for the ${zigVersion.major.toString()}.${zigVersion.minor.toString()} release cycle are currently available`;
     case SelectVersionFailureCode.DevelopmentBuildIncompatible:
       return `Zig ${zigVersion.toString()} has no compatible ZLS build (yet)`;
     case SelectVersionFailureCode.TaggedReleaseIncompatible:

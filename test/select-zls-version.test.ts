@@ -515,7 +515,7 @@ describe("/v1/zls/select-version", () => {
       [
         "0.10.0-dev.5+aaaaaaaaa",
         SelectVersionFailureCode.DevelopmentBuildUnsupported,
-        "No builds for the 0.10 release cycle are available",
+        "No builds for the 0.10 release cycle are currently available",
       ],
       [
         "0.9.0-dev.10+aaaaaaaaa",
