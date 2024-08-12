@@ -13,12 +13,16 @@ All artifacts are signed with [minisign](https://jedisct1.github.io/minisign/) u
 RWR+9B91GBZ0zOjh6Lr17+zKf5BoSuFvrx2xSeDE57uIYvnKBGmMjOex
 ```
 
-## /v1/zls/select-version?zig_version=${VERSION}&compatibility=${COMPATIBILITY}
+## /v1/zls/select-version
 
 Will respond with metadata about a ZLS build that is useable with the given Zig version.
 The response body is similar to Zig's [index.json](https://ziglang.org/download/index.json).
 
-The `compatibility` query-string must be either `only-runtime` or `full`:
+### Query Parameters
+
+The `zig_version` query parameter must be the Zig Version that is being used. (e.g. `0.13.0-dev.7+73c6c13a`)
+
+The `compatibility` query parameter must be either `only-runtime` or `full`:
 
 - `full`: Request a ZLS build that can be built and used with the given Zig version.
 - `only-runtime`: Request a ZLS build that can be used at runtime with the given Zig version but may not be able to build ZLS from source.
@@ -122,7 +126,7 @@ Version Order Guide: `0.12.0-dev` < `0.12.0` < `0.13.0-dev` < `0.13.0`
 ```json
 {
   "code": 1,
-  "message": "No builds for the ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION} release cycle are available"
+  "message": "No builds for the ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION} release cycle are currently available"
 }
 ```
 
