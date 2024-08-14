@@ -404,7 +404,7 @@ describe("/v1/zls/select-version", () => {
     );
     expect(await response.json()).toStrictEqual<SelectVersionFailureResponse>({
       code: SelectVersionFailureCode.TaggedReleaseIncompatible,
-      message: "ZLS 0.11.* does not exist (yet)",
+      message: "ZLS 0.11 has not been released yet",
     });
     expect(response.status).toBe(200);
   });
@@ -510,7 +510,7 @@ describe("/v1/zls/select-version", () => {
       [
         "0.15.0",
         SelectVersionFailureCode.TaggedReleaseIncompatible,
-        "ZLS 0.15.* does not exist (yet)",
+        "ZLS 0.15 has not been released yet",
       ],
       [
         "0.10.0-dev.5+aaaaaaaaa",

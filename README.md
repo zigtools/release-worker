@@ -9,6 +9,7 @@ The API Endpoint is `releases.zigtools.org`.
 Build artifacts that target windows are compressed as `.zip` files. All other targets are available as `.tar.xz` and `.tar.gz`.
 
 All artifacts are signed with [minisign](https://jedisct1.github.io/minisign/) using the following public key:
+
 ```
 RWR+9B91GBZ0zOjh6Lr17+zKf5BoSuFvrx2xSeDE57uIYvnKBGmMjOex
 ```
@@ -99,7 +100,7 @@ curl "https://releases.zigtools.org/v1/zls/select-version?zig_version=0.30.0&com
 ```json
 {
   "code": 1,
-  "message": "ZLS 0.30.* does not exist (yet)"
+  "message": "ZLS 0.30 has not been released yet"
 }
 ```
 
@@ -150,7 +151,7 @@ This error only occurs on development/nightly builds of Zig.
 ```json
 {
   "code": 3,
-  "message": "ZLS ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION}.* does not exist (yet)"
+  "message": "ZLS ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION} has not been released yet"
 }
 ```
 
