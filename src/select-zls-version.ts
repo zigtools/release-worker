@@ -390,14 +390,12 @@ async function selectOnDevelopmentBuild(
   }
 
   const oldestRelease = JSON.parse(releases[0].JsonData) as D2JsonData;
-  const oldestMinRuntimeZigVersion = SemanticVersion.parse(
-    oldestRelease.minimumRuntimeZigVersion,
+  const oldestMinZigVersion = selectMinimumZigVersion(
+    oldestRelease,
+    compatibility,
   );
-  assert(oldestMinRuntimeZigVersion !== null);
 
-  if (
-    SemanticVersion.order(zigVersion, oldestMinRuntimeZigVersion) == Order.lt
-  ) {
+  if (SemanticVersion.order(zigVersion, oldestMinZigVersion) == Order.lt) {
     return SelectVersionFailureCode.Unsupported;
   }
 
@@ -409,13 +407,11 @@ async function selectOnDevelopmentBuild(
 
   for (const entry of releases) {
     const data = JSON.parse(entry.JsonData) as D2JsonData;
-    const minimumRuntimeZigVersion = SemanticVersion.parse(
-      data.minimumRuntimeZigVersion,
-    );
-    assert(minimumRuntimeZigVersion !== null);
     assert(data.artifacts.length !== 0);
 
-    switch (SemanticVersion.order(zigVersion, minimumRuntimeZigVersion)) {
+    const minimumZigVersion = selectMinimumZigVersion(data, compatibility);
+
+    switch (SemanticVersion.order(zigVersion, minimumZigVersion)) {
       case Order.lt:
         // the minimum build version may not be monotonically increasing (i.e a
         // newer release has lower minimum build version) so keep searching
@@ -469,4 +465,27 @@ async function selectOnDevelopmentBuild(
   }
 
   return selectedEntry;
+}
+
+function selectMinimumZigVersion(
+  data: D2JsonData,
+  compatibility: Exclude<VersionCompatibility, VersionCompatibility.None>,
+): SemanticVersion {
+  const minBuildZigVersion = SemanticVersion.parse(data.minimumBuildZigVersion);
+  assert(minBuildZigVersion !== null);
+
+  const minRuntimeZigVersion = SemanticVersion.parse(
+    data.minimumRuntimeZigVersion,
+  );
+  assert(minRuntimeZigVersion !== null);
+
+  switch (compatibility) {
+    case VersionCompatibility.Full:
+      return SemanticVersion.order(minBuildZigVersion, minRuntimeZigVersion) ==
+        Order.lt
+        ? minRuntimeZigVersion
+        : minBuildZigVersion;
+    case VersionCompatibility.OnlyRuntime:
+      return minRuntimeZigVersion;
+  }
 }

@@ -435,16 +435,17 @@ describe("/v1/zls/select-version", () => {
       });
     });
 
-    test.each<[string, keyof typeof VersionCompatibility, string | null]>([
+    test.each<[string, "Both" | "Full" | "OnlyRuntime", string | null]>([
       ["0.0.0", "Full", null],
       ["0.0.0-dev.1+aaaaaaaaa", "Full", null],
       ["0.7.0-dev.5+aaaaaaaaa", "Full", null],
       ["0.9.0-dev.10+aaaaaaaaa", "Full", null],
-      ["0.9.0-dev.15+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.20+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.25+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.27+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
-      ["0.9.0-dev.27+aaaaaaaaa", "Full", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.15+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.15+aaaaaaaaa", "Full", null],
+      ["0.9.0-dev.20+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.20+aaaaaaaaa", "Full", null],
+      ["0.9.0-dev.25+aaaaaaaaa", "Both", "0.9.0-dev.3+aaaaaaaaa"],
+      ["0.9.0-dev.27+aaaaaaaaa", "Both", "0.9.0-dev.3+aaaaaaaaa"],
       ["0.9.0-dev.30+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
       ["0.9.0-dev.30+aaaaaaaaa", "Full", null],
       ["0.9.0-dev.35+aaaaaaaaa", "OnlyRuntime", "0.9.0-dev.3+aaaaaaaaa"],
@@ -478,20 +479,32 @@ describe("/v1/zls/select-version", () => {
     ])(
       "Zig %s, %s -> ZLS %s",
       async (zigVersion, compatibility, expectedZLSVersion) => {
-        const response = await selectZLSVersion(
-          zigVersion,
-          VersionCompatibility[compatibility],
-        );
-        if (expectedZLSVersion === null) {
-          expect(response).not.toHaveProperty("version");
-          expect(response).toHaveProperty("code");
-          expect(response).toHaveProperty("message");
-        } else {
-          expect(response).not.toHaveProperty("code");
-          assert(!("code" in response));
-          expect(response).not.toHaveProperty("message");
-          assert(!("message" in response));
-          expect(response.version).toBe<string>(expectedZLSVersion);
+        const cases: VersionCompatibility[] = [];
+        switch (compatibility) {
+          case "Full":
+            cases.push(VersionCompatibility.Full);
+            break;
+          case "OnlyRuntime":
+            cases.push(VersionCompatibility.OnlyRuntime);
+            break;
+          case "Both":
+            cases.push(
+              VersionCompatibility.OnlyRuntime,
+              VersionCompatibility.Full,
+            );
+            break;
+        }
+        for (const compat of cases) {
+          const response = await selectZLSVersion(zigVersion, compat);
+          if (expectedZLSVersion === null) {
+            expect(response).not.toHaveProperty("version");
+            expect(response).toHaveProperty("code");
+            expect(response).toHaveProperty("message");
+          } else {
+            expect(response).toHaveProperty("version", expectedZLSVersion);
+            expect(response).not.toHaveProperty("code");
+            expect(response).not.toHaveProperty("message");
+          }
         }
       },
     );
