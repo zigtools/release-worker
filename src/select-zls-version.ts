@@ -138,18 +138,6 @@ function failure(status: number, message: string): Response {
   );
 }
 
-/** The versions are sorted in ascending order */
-async function queryAllTaggedReleases(
-  env: Env,
-): Promise<{ JsonData: string }[]> {
-  // update the "explain query plan when searching all tagged releases" test when modifying the query
-  return (
-    await env.ZIGTOOLS_DB.prepare(
-      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-    ).all<{ JsonData: string }>()
-  ).results;
-}
-
 /** `${ENDPOINT}/zls/index.json` */
 export async function handleZLSIndex(
   request: Request,
@@ -163,11 +151,14 @@ export async function handleZLSIndex(
     return failure(500, "Internal Server Error"); // Internal Server Error
   }
 
-  const releases = await queryAllTaggedReleases(env);
+  const releases = await env.ZIGTOOLS_DB.prepare(
+    // update the "explain query plan when searching all tagged releases" test when modifying the query
+    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+  ).all<{ JsonData: string }>();
 
   const response: ZLSIndexResponse = {};
 
-  for (const entry of releases) {
+  for (const entry of releases.results) {
     const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
     response[jsonData.zlsVersion] = {
       date: new Date(jsonData.date).toISOString().slice(0, 10),
@@ -266,8 +257,8 @@ async function selectOnTaggedRelease(
 ): Promise<D2JsonData | SelectVersionFailureCode> {
   assert(zigVersion.isRelease);
 
-  // update the "explain query plan when searching on tagged release (sorted)" test when modifying the query
   const selectedRelease = await env.ZIGTOOLS_DB.prepare(
+    // update the "explain query plan when searching on tagged release (sorted)" test when modifying the query
     "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionPatch DESC",
   )
     .bind(zigVersion.major, zigVersion.minor)
@@ -278,10 +269,13 @@ async function selectOnTaggedRelease(
   }
 
   // If the version is older than the oldest available tagged release then the version is declared unsupported.
-  const releases = await queryAllTaggedReleases(env);
+  const oldestRelease = await env.ZIGTOOLS_DB.prepare(
+    // update the "explain query plan when searching all tagged releases" test when modifying the query
+    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor ASC, ZLSVersionMinor ASC, ZLSVersionPatch ASC",
+  ).first<{ JsonData: string }>();
 
-  if (releases.length !== 0) {
-    const oldest = JSON.parse(releases[0].JsonData) as D2JsonData;
+  if (oldestRelease != null) {
+    const oldest = JSON.parse(oldestRelease.JsonData) as D2JsonData;
     const oldestMinRuntimeZigVersion = SemanticVersion.parse(
       oldest.minimumRuntimeZigVersion,
     );
@@ -369,23 +363,34 @@ async function selectOnDevelopmentBuild(
 ): Promise<D2JsonData | SelectVersionFailureCode> {
   assert(!zigVersion.isRelease);
 
-  const [developmentReleases, taggedReleases] = await env.ZIGTOOLS_DB.batch<{
-    JsonData: string;
-  }>([
+  const developmentReleases = await env.ZIGTOOLS_DB.prepare(
     // update the "explain query plan when searching on development built" test when modifying the query
-    env.ZIGTOOLS_DB.prepare(
-      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
-    ).bind(zigVersion.major, zigVersion.minor),
-    // update the "explain query plan when searching on tagged release" test when modifying the query
-    env.ZIGTOOLS_DB.prepare(
-      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2",
-    ).bind(zigVersion.major, zigVersion.minor - 1),
-  ]);
+    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
+  ).bind(zigVersion.major, zigVersion.minor).all<{ JsonData: string; }>();
 
-  // tagged releases come first so that development builts come first
-  const releases = taggedReleases.results.concat(developmentReleases.results);
+  let releases: { JsonData: string; }[] = [];
+  if (developmentReleases.results.length !== 0) {
+    releases = developmentReleases.results;
+  } else {
+    // This is to handle the following situtation:
+    // 1. Zig has tagged a new release (e.g `0.13.0`)
+    // 2. new Zig development builds have come out (e.g 0.13.0-dev.1+aaaaaaa)
+    // 3. ZLS has tagged a new release (e.g `0.13.0`)
+    // 4. but no ZLS development builds have come out!
+    //
+    // Querying with `0.13.0-dev.1+aaaaaaa` should return `0.13.0`. This 
+    // should only happen for the latest tagged release while previous 
+    // releases will report 'unsupported'.
+    //
+    // This is why only the latest tagged release is selected.
+    const latestTaggedRelease = await env.ZIGTOOLS_DB.prepare(
+      // update the "explain query plan when searching all tagged releases" test when modifying the query
+      "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+    ).first<{ JsonData: string; }>();
+    releases = latestTaggedRelease ? [latestTaggedRelease] : [];
+  }
 
-  if (releases.length === 0) {
+  if (releases.length == 0) {
     return SelectVersionFailureCode.DevelopmentBuildUnsupported;
   }
 
@@ -396,7 +401,11 @@ async function selectOnDevelopmentBuild(
   );
 
   if (SemanticVersion.order(zigVersion, oldestMinZigVersion) == Order.lt) {
-    return SelectVersionFailureCode.Unsupported;
+    if (developmentReleases.results.length == 0) {
+      return SelectVersionFailureCode.DevelopmentBuildUnsupported;
+    } else {
+      return SelectVersionFailureCode.Unsupported;
+    }
   }
 
   // The following algorithm assumes that the Zig version and tested Zig

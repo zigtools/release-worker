@@ -398,13 +398,24 @@ describe("/v1/zls/select-version", () => {
     },
   );
 
-  test("search on empty database with Zig version", async () => {
+  test("search on empty database with tagged Zig version", async () => {
     const response = await SELF.fetch(
       "https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=full",
     );
     expect(await response.json()).toStrictEqual<SelectVersionFailureResponse>({
       code: SelectVersionFailureCode.TaggedReleaseIncompatible,
       message: "ZLS 0.11 has not been released yet",
+    });
+    expect(response.status).toBe(200);
+  });
+
+  test("search on empty database with development Zig version", async () => {
+    const response = await SELF.fetch(
+      `https://example.com/v1/zls/select-version?zig_version=${encodeURIComponent("0.11.0-dev.1+aaaaaaaaa")}&compatibility=full`,
+    );
+    expect(await response.json()).toStrictEqual<SelectVersionFailureResponse>({
+      code: SelectVersionFailureCode.DevelopmentBuildUnsupported,
+      message: "No builds for the 0.11 release cycle are currently available",
     });
     expect(response.status).toBe(200);
   });
@@ -472,8 +483,10 @@ describe("/v1/zls/select-version", () => {
       ["0.12.0-dev.18+aaaaaaaaa", "Full", "0.12.0-dev.3+aaaaaaaaa"],
       ["0.12.0", "Full", "0.12.1"],
       ["0.12.1", "Full", "0.12.1"],
-      ["0.13.0-dev.1+aaaaaaaaa", "Full", "0.12.1"],
+      ["0.13.0-dev.1+aaaaaaaaa", "OnlyRuntime", null],
       ["0.13.0", "Full", "0.13.0"],
+      ["0.14.0-dev.3+aaaaaaaaa", "Full", "0.13.0"],
+      ["0.14.0-dev.4+aaaaaaaaa", "Full", null],
       ["0.14.0", "Full", null],
       ["0.15.0", "Full", null],
     ])(
@@ -539,6 +552,11 @@ describe("/v1/zls/select-version", () => {
         "0.12.0-dev.13+aaaaaaaaa",
         SelectVersionFailureCode.DevelopmentBuildIncompatible,
         "Zig 0.12.0-dev.13+aaaaaaaaa has no compatible ZLS build (yet)",
+      ],
+      [
+        "0.14.0-dev.10+aaaaaaaaa",
+        SelectVersionFailureCode.DevelopmentBuildIncompatible,
+        "Zig 0.14.0-dev.10+aaaaaaaaa has no compatible ZLS build (yet)",
       ],
     ])(
       "Zig %s should error with '%s'",
