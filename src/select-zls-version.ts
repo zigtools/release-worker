@@ -387,7 +387,7 @@ async function selectOnDevelopmentBuild(
       // update the "explain query plan when searching all tagged releases" test when modifying the query
       "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
     ).first<{ JsonData: string; }>();
-    releases = latestTaggedRelease ? [latestTaggedRelease] : [];
+    releases = (latestTaggedRelease != null) ? [latestTaggedRelease] : [];
   }
 
   if (releases.length == 0) {
