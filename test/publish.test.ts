@@ -11,6 +11,7 @@ import {
   VersionCompatibility,
   xzMagicNumber,
   zipMagicNumber,
+  ZLSIndex,
 } from "../src/shared";
 import { handlePublish } from "../src/publish";
 
@@ -826,6 +827,9 @@ describe("/v1/zls/publish", () => {
 
     expect(objects.objects).toMatchObject([
       {
+        key: "index.json",
+      },
+      {
         key: "zls-linux-x86_64-0.1.0.tar.gz",
         size: gzipMagicNumber.length + 7,
       },
@@ -839,12 +843,12 @@ describe("/v1/zls/publish", () => {
       },
     ]);
 
-    assert(objects.objects[0].checksums.sha256 !== undefined);
     assert(objects.objects[1].checksums.sha256 !== undefined);
     assert(objects.objects[2].checksums.sha256 !== undefined);
+    assert(objects.objects[3].checksums.sha256 !== undefined);
 
     expect(
-      Buffer.from(objects.objects[0].checksums.sha256).toString("hex"),
+      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(gzipMagicNumber)
@@ -852,7 +856,7 @@ describe("/v1/zls/publish", () => {
         .digest("hex"),
     );
     expect(
-      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
+      Buffer.from(objects.objects[2].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(xzMagicNumber)
@@ -860,7 +864,7 @@ describe("/v1/zls/publish", () => {
         .digest("hex"),
     );
     expect(
-      Buffer.from(objects.objects[2].checksums.sha256).toString("hex"),
+      Buffer.from(objects.objects[3].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(zipMagicNumber)
@@ -923,6 +927,9 @@ describe("/v1/zls/publish", () => {
     const objects = await env.ZIGTOOLS_BUILDS.list({});
 
     expect(objects.objects).toMatchObject([
+      {
+        key: "index.json",
+      },
       {
         key: "zls-linux-x86_64-0.1.0.tar.gz",
         size: gzipMagicNumber.length + 7,
@@ -1230,7 +1237,7 @@ describe("/v1/zls/publish", () => {
   });
 
   test("publish new successfull build with different Zig versions", async () => {
-    const date = Date.now();
+    const date = 1729123200000;
     vi.setSystemTime(date);
 
     {
@@ -1317,6 +1324,9 @@ describe("/v1/zls/publish", () => {
 
     expect(objects.objects).toMatchObject([
       {
+        key: "index.json",
+      },
+      {
         key: "zls-linux-x86_64-0.11.0.tar.gz",
         size: gzipMagicNumber.length + 7,
       },
@@ -1326,11 +1336,11 @@ describe("/v1/zls/publish", () => {
       },
     ]);
 
-    assert(objects.objects[0].checksums.sha256 !== undefined);
     assert(objects.objects[1].checksums.sha256 !== undefined);
+    assert(objects.objects[2].checksums.sha256 !== undefined);
 
     expect(
-      Buffer.from(objects.objects[0].checksums.sha256).toString("hex"),
+      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(gzipMagicNumber)
@@ -1338,12 +1348,31 @@ describe("/v1/zls/publish", () => {
         .digest("hex"),
     );
     expect(
-      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
+      Buffer.from(objects.objects[2].checksums.sha256).toString("hex"),
     ).toBe(
       createHash("sha256")
         .update(xzMagicNumber)
         .update("binary1")
         .digest("hex"),
     );
+
+    const response = await env.ZIGTOOLS_BUILDS.get("index.json");
+    assert(response !== null);
+
+    const zlsIndex = await response.json<ZLSIndex>();
+
+    expect(zlsIndex).toStrictEqual({
+      "0.11.0": {
+        date: "2024-10-17",
+        "x86_64-linux": {
+          shasum: createHash("sha256")
+            .update(xzMagicNumber)
+            .update("binary1")
+            .digest("hex"),
+          size: (xzMagicNumber.length + 7).toString(),
+          tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
+        },
+      },
+    });
   });
 });

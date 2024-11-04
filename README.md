@@ -164,13 +164,18 @@ This error only occurs on tagged releases of Zig.
 
 ## /v1/zls/index.json
 
-The response body imitates Zig's [index.json](https://ziglang.org/download/index.json) except that there is no field for `master`. Development builds of ZLS should be queried by supplying the Zig version that is being used.
+> [!CAUTION]
+> This request has been moved to [index.json](https://builds.zigtools.org/index.json)
+
+## index.json
+
+The [index.json](https://builds.zigtools.org/index.json) imitates Zig's [index.json](https://ziglang.org/download/index.json) except that there is no field for `master`. Development builds of ZLS should be queried by supplying the Zig version that is being used.
 
 <details>
   <summary>Show Example</summary>
   
   ```bash
-  curl "https://releases.zigtools.org/v1/zls/index.json"
+  curl "https://builds.zigtools.org/index.json"
   ```
   
   ```json

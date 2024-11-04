@@ -1,7 +1,12 @@
 import assert from "node:assert";
 import { Env } from "./env";
 import { Order, SemanticVersion } from "./semantic-version";
-import { D2JsonData, ReleaseArtifact, VersionCompatibility } from "./shared";
+import {
+  ArtifactEntry,
+  D2JsonData,
+  VersionCompatibility,
+  artifactsToRecord,
+} from "./shared";
 
 /**
  * Similar to https://ziglang.org/download/index.json
@@ -81,52 +86,6 @@ function selectZLSVersionFailureCodeToString(
   }
 }
 
-/**
- * Similar to https://ziglang.org/download/index.json
- */
-export type ZLSIndexResponse = Record<
-  string,
-  {
-    /** `YYYY-MM-DD` */
-    date: string;
-    [artifact: string]: ArtifactEntry | string | undefined;
-  }
->;
-
-export interface ArtifactEntry {
-  /** A download URL */
-  tarball: string;
-  /** A SHA256 hash of the tarball */
-  shasum: string;
-  /** Size of the tarball in bytes */
-  size: string;
-}
-
-function artifactsToRecord(
-  env: Env,
-  artifacts: ReleaseArtifact[],
-): Record<string, ArtifactEntry> {
-  assert(artifacts.length !== 0);
-  const targets: Record<string, ArtifactEntry> = {};
-  for (const artifact of artifacts) {
-    switch (artifact.extension) {
-      case "tar.gz":
-        continue;
-      case "tar.xz":
-      case "zip":
-        break;
-    }
-    assert(!(`${artifact.arch}-${artifact.os}` in targets));
-    assert.strictEqual(artifact.fileShasum.length, 64);
-    targets[`${artifact.arch}-${artifact.os}`] = {
-      tarball: `${env.R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
-      shasum: artifact.fileShasum,
-      size: artifact.fileSize.toString(),
-    };
-  }
-  return targets;
-}
-
 function failure(status: number, message: string): Response {
   return Response.json(
     {
@@ -136,41 +95,6 @@ function failure(status: number, message: string): Response {
       status: status,
     },
   );
-}
-
-/** `${ENDPOINT}/zls/index.json` */
-export async function handleZLSIndex(
-  request: Request,
-  env: Env,
-): Promise<Response> {
-  if (request.method !== "GET") {
-    return failure(405, "method must be 'GET'"); // Method Not Allowed
-  }
-
-  if (typeof env.R2_PUBLIC_URL !== "string" || !env.R2_PUBLIC_URL) {
-    return failure(500, "Internal Server Error"); // Internal Server Error
-  }
-
-  const releases = await env.ZIGTOOLS_DB.prepare(
-    // update the "explain query plan when searching all tagged releases" test when modifying the query
-    "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-  ).all<{ JsonData: string }>();
-
-  const response: ZLSIndexResponse = {};
-
-  for (const entry of releases.results) {
-    const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
-    response[jsonData.zlsVersion] = {
-      date: new Date(jsonData.date).toISOString().slice(0, 10),
-      ...artifactsToRecord(env, jsonData.artifacts),
-    };
-  }
-
-  return Response.json(response, {
-    headers: {
-      "cache-control": "public, max-age=3600", // 1 hour
-    },
-  });
 }
 
 /** `${ENDPOINT}/zls/select-version?zig_version=0.12.0&compatibility=full` */
@@ -238,7 +162,7 @@ export async function handleSelectVersion(
     response = {
       version: selectedVersion.zlsVersion,
       date: new Date(selectedVersion.date).toISOString().slice(0, 10),
-      ...artifactsToRecord(env, selectedVersion.artifacts),
+      ...artifactsToRecord(env.R2_PUBLIC_URL, selectedVersion.artifacts),
     };
   }
 
@@ -366,9 +290,11 @@ async function selectOnDevelopmentBuild(
   const developmentReleases = await env.ZIGTOOLS_DB.prepare(
     // update the "explain query plan when searching on development built" test when modifying the query
     "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 0 AND ZLSVersionMajor = ?1 AND ZLSVersionMinor = ?2 ORDER BY ZLSVersionBuildID ASC",
-  ).bind(zigVersion.major, zigVersion.minor).all<{ JsonData: string; }>();
+  )
+    .bind(zigVersion.major, zigVersion.minor)
+    .all<{ JsonData: string }>();
 
-  let releases: { JsonData: string; }[] = [];
+  let releases: { JsonData: string }[] = [];
   if (developmentReleases.results.length !== 0) {
     releases = developmentReleases.results;
   } else {
@@ -378,16 +304,16 @@ async function selectOnDevelopmentBuild(
     // 3. ZLS has tagged a new release (e.g `0.13.0`)
     // 4. but no ZLS development builds have come out!
     //
-    // Querying with `0.13.0-dev.1+aaaaaaa` should return `0.13.0`. This 
-    // should only happen for the latest tagged release while previous 
+    // Querying with `0.13.0-dev.1+aaaaaaa` should return `0.13.0`. This
+    // should only happen for the latest tagged release while previous
     // releases will report 'unsupported'.
     //
     // This is why only the latest tagged release is selected.
     const latestTaggedRelease = await env.ZIGTOOLS_DB.prepare(
       // update the "explain query plan when searching all tagged releases" test when modifying the query
       "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-    ).first<{ JsonData: string; }>();
-    releases = (latestTaggedRelease != null) ? [latestTaggedRelease] : [];
+    ).first<{ JsonData: string }>();
+    releases = latestTaggedRelease != null ? [latestTaggedRelease] : [];
   }
 
   if (releases.length == 0) {

@@ -1,6 +1,6 @@
 import { Env } from "./env";
 import { handlePublish } from "./publish";
-import { handleSelectVersion, handleZLSIndex } from "./select-zls-version";
+import { handleSelectVersion } from "./select-zls-version";
 
 export default {
   async fetch(request, env, _ctx) {
@@ -13,8 +13,7 @@ export default {
         response = await handleSelectVersion(request, env);
         break;
       case "/v1/zls/index.json":
-        response = await handleZLSIndex(request, env);
-        break;
+        return Response.redirect(`${env.R2_PUBLIC_URL}/index.json`, 301);
       case "/v1/zls/publish":
         response = await handlePublish(request, env);
         break;

@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import assert from "node:assert";
 
 export const xzMagicNumber = Buffer.from("FD377A585A00", "hex");
 export const gzipMagicNumber = Buffer.from("1F8B", "hex");
@@ -40,6 +41,27 @@ export interface ReleaseArtifact {
 
 export type Extension = "tar.xz" | "tar.gz" | "zip";
 
+/**
+ * Similar to https://ziglang.org/download/index.json
+ */
+export type ZLSIndex = Record<
+  string,
+  {
+    /** `YYYY-MM-DD` */
+    date: string;
+    [artifact: string]: ArtifactEntry | string | undefined;
+  }
+>;
+
+export interface ArtifactEntry {
+  /** A download URL */
+  tarball: string;
+  /** A SHA256 hash of the tarball */
+  shasum: string;
+  /** Size of the tarball in bytes */
+  size: string;
+}
+
 export interface SQLiteQueryPlanRow {
   id: number;
   parent: number;
@@ -56,4 +78,29 @@ export function getMagicNumberOfExtension(extension: Extension): Buffer {
     case "zip":
       return zipMagicNumber;
   }
+}
+
+export function artifactsToRecord(
+  R2_PUBLIC_URL: string,
+  artifacts: ReleaseArtifact[],
+): Record<string, ArtifactEntry> {
+  assert(artifacts.length !== 0);
+  const targets: Record<string, ArtifactEntry> = {};
+  for (const artifact of artifacts) {
+    switch (artifact.extension) {
+      case "tar.gz":
+        continue;
+      case "tar.xz":
+      case "zip":
+        break;
+    }
+    assert(!(`${artifact.arch}-${artifact.os}` in targets));
+    assert.strictEqual(artifact.fileShasum.length, 64);
+    targets[`${artifact.arch}-${artifact.os}`] = {
+      tarball: `${R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
+      shasum: artifact.fileShasum,
+      size: artifact.fileSize.toString(),
+    };
+  }
+  return targets;
 }

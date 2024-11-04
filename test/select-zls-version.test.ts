@@ -9,11 +9,9 @@ import {
 } from "../src/shared";
 import {
   handleSelectVersion,
-  ZLSIndexResponse,
   SelectVersionResponse,
   SelectVersionFailureResponse,
   SelectVersionFailureCode,
-  handleZLSIndex,
 } from "../src/select-zls-version";
 import { SemanticVersion } from "../src/semantic-version";
 
@@ -198,131 +196,14 @@ function shuffleArray(array: unknown[]) {
 }
 
 describe("/v1/zls/index.json", () => {
-  test("method should be 'GET'", async () => {
+  test("check for redirect", async () => {
     const response = await SELF.fetch("https://example.com/v1/zls/index.json", {
-      method: "POST",
+      redirect: "manual",
     });
-    expect(await response.json()).toStrictEqual({
-      error: "method must be 'GET'",
-    });
-    expect(response.status).toBe(405);
-  });
-
-  test.each<unknown>([null, "", {}, []])(
-    "check for invalid R2_PUBLIC_URL: %j",
-    async (value) => {
-      const response = await handleZLSIndex(
-        new Request("https://example.com/v1/zls/index.json"),
-        {
-          ...env,
-          R2_PUBLIC_URL: value as string,
-        },
-      );
-      expect(response.status).toBe(500);
-    },
-  );
-
-  test("search on empty database", async () => {
-    const response = await SELF.fetch("https://example.com/v1/zls/index.json");
-    expect(await response.json()).toStrictEqual({});
-    expect(response.status).toBe(200);
-  });
-
-  describe("test on sample database", () => {
-    beforeEach(populateDatabase);
-
-    test("search without version", async () => {
-      const response = await SELF.fetch(
-        "https://example.com/v1/zls/index.json",
-      );
-      const body = await response.json<ZLSIndexResponse>();
-
-      expect(Object.keys(body)).toStrictEqual([
-        "0.13.0",
-        "0.12.1",
-        "0.12.0",
-        "0.11.0",
-      ]);
-      expect(body).toStrictEqual({
-        "0.11.0": {
-          date: "1970-01-01",
-          "x86_64-linux": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum:
-              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            size: "12",
-          },
-          "aarch64-windows": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum:
-              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            size: "12",
-          },
-        },
-        "0.12.0": {
-          date: "1970-01-01",
-          "x86_64-linux": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum:
-              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            size: "12",
-          },
-          "aarch64-windows": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum:
-              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            size: "12",
-          },
-        },
-        "0.12.1": {
-          date: "1970-01-01",
-          "x86_64-linux": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum:
-              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            size: "12",
-          },
-          "aarch64-windows": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum:
-              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            size: "12",
-          },
-        },
-        "0.13.0": {
-          date: "1970-01-01",
-          "x86_64-linux": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
-            shasum:
-              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            size: "12",
-          },
-          "aarch64-windows": {
-            tarball: `${env.R2_PUBLIC_URL}/zls-windows-aarch64-0.11.0.zip`,
-            shasum:
-              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            size: "12",
-          },
-        },
-      });
-      expect(response.status).toBe(200);
-    });
-  });
-
-  test("explain query plan when searching all tagged releases", async () => {
-    const response = await env.ZIGTOOLS_DB.prepare(
-      "EXPLAIN QUERY PLAN SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
-    ).all<SQLiteQueryPlanRow>();
-
-    // TODO test `response.meta.rows_read` on an example database
-
-    expect(response.results).toMatchObject([
-      {
-        notused: 0,
-        detail:
-          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=?)",
-      },
-    ]);
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe(
+      `${env.R2_PUBLIC_URL}/index.json`,
+    );
   });
 });
 
@@ -571,6 +452,22 @@ describe("/v1/zls/select-version", () => {
         });
       },
     );
+  });
+
+  test("explain query plan when searching all tagged releases", async () => {
+    const response = await env.ZIGTOOLS_DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT ZLSVersion, JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+    ).all<SQLiteQueryPlanRow>();
+
+    // TODO test `response.meta.rows_read` on an example database
+
+    expect(response.results).toMatchObject([
+      {
+        notused: 0,
+        detail:
+          "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=?)",
+      },
+    ]);
   });
 
   test("explain query plan when searching on tagged release", async () => {

@@ -8,6 +8,8 @@ import {
   Extension,
   ReleaseArtifact,
   VersionCompatibility,
+  ZLSIndex,
+  artifactsToRecord,
   getMagicNumberOfExtension,
 } from "./shared";
 import { SemanticVersion } from "./semantic-version";
@@ -476,16 +478,22 @@ export async function handlePublish(
     }
   }
 
-  let skipArtifactUpload;
+  const taggedReleases = await env.ZIGTOOLS_DB.prepare(
+    // update the "explain query plan when searching all tagged releases" test when modifying the query
+    "SELECT ZLSVersion, JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
+  ).all<{ ZLSVersion: string; JsonData: string }>();
 
+  let artifactsAlreadyExist: boolean;
   if (zlsVersion.isRelease) {
-    const result = await env.ZIGTOOLS_DB.prepare(
-      "SELECT ZLSVersion,JsonData FROM ZLSReleases WHERE ZLSVersion = ?1",
-    )
-      .bind(zlsVersionString)
-      .first<{ ZLSVersion: string }>();
-
-    skipArtifactUpload = result !== null;
+    artifactsAlreadyExist = taggedReleases.results
+      .map(({ ZLSVersion }) => ZLSVersion)
+      .includes(zlsVersionString);
+    if (!artifactsAlreadyExist) {
+      taggedReleases.results.push({
+        ZLSVersion: zlsVersionString,
+        JsonData: JSON.stringify(newEntryValue),
+      });
+    }
   } else {
     assert(zlsVersion.commitHeight !== undefined);
     const result = await env.ZIGTOOLS_DB.prepare(
@@ -499,7 +507,7 @@ export async function handlePublish(
       )
       .first<{ ZLSVersion: string }>();
 
-    skipArtifactUpload = result !== null;
+    artifactsAlreadyExist = result !== null;
 
     if (result !== null && zlsVersionString !== result.ZLSVersion) {
       return new Response(
@@ -535,9 +543,28 @@ export async function handlePublish(
     ),
   ]);
 
-  if (skipArtifactUpload) return new Response();
+  if (artifactsAlreadyExist) return new Response();
 
-  const promises: Promise<R2Object>[] = [];
+  const promises: Promise<unknown>[] = [];
+
+  {
+    const index: ZLSIndex = {};
+
+    for (const entry of taggedReleases.results) {
+      const jsonData = JSON.parse(entry.JsonData) as D2JsonData;
+      index[jsonData.zlsVersion] = {
+        date: new Date(jsonData.date).toISOString().slice(0, 10),
+        ...artifactsToRecord(env.R2_PUBLIC_URL, jsonData.artifacts),
+      };
+    }
+
+    promises.push(
+      env.ZIGTOOLS_BUILDS.put(
+        "index.json",
+        JSON.stringify(index, undefined, 2),
+      ),
+    );
+  }
 
   for (let i = 0; i < artifacts.length; i++) {
     const artifact = artifacts[i];
