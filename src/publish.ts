@@ -562,6 +562,11 @@ export async function handlePublish(
       env.ZIGTOOLS_BUILDS.put(
         "index.json",
         JSON.stringify(index, undefined, 2),
+        {
+          httpMetadata: {
+            contentType: "application/json",
+          },
+        },
       ),
     );
   }
