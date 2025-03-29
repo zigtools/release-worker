@@ -42,42 +42,42 @@ The `compatibility` query parameter must be either `only-runtime` or `full`:
   {
     "version": "0.12.0",
     "date": "2024-04-26",
-    "windows-x86_64": {
+    "x86_64-windows": {
       "tarball": "https://builds.zigtools.org/zls-windows-x86_64-0.12.0.zip",
       "shasum": "9656942a98e6d582b8e1d7486d0d3523ee80b0120d4a1d0740e963e45ea88954",
       "size": "3697303"
     },
-    "windows-x86": {
+    "x86-windows": {
       "tarball": "https://builds.zigtools.org/zls-windows-x86-0.12.0.zip",
       "shasum": "4a27fa034f0d2c0f32481eb4b32e198b68115440d501b126463bfa72000c4b38",
       "size": "3850972"
     },
-    "linux-x86_64": {
+    "x86_64-linux": {
       "tarball": "https://builds.zigtools.org/zls-linux-x86_64-0.12.0.tar.xz",
       "shasum": "3a055bc2ead457d45d71fe16d63166ac9586beea2728ac2af12e0fd8217fbe2e",
       "size": "3241444"
     },
-    "macos-x86_64": {
+    "x86_64-macos": {
       "tarball": "https://builds.zigtools.org/zls-macos-x86_64-0.12.0.tar.xz",
       "shasum": "6360f923e6e9a68ad317a73bd2990bc3e445c0815ec1c914329a188385660f3a",
       "size": "1038340"
     },
-    "linux-x86": {
+    "x86-linux": {
       "tarball": "https://builds.zigtools.org/zls-linux-x86-0.12.0.tar.xz",
       "shasum": "1d9905c22787242273c6064a76032b8eb9357150c2fd24d1442c70a21f686f39",
       "size": "3308004"
     },
-    "linux-aarch64": {
+    "aarch64-linux": {
       "tarball": "https://builds.zigtools.org/zls-linux-aarch64-0.12.0.tar.xz",
       "shasum": "9f34884ff22791c2f7c2c7acbe7b9497c4c15321c6ce9c769346b4f4c3d73172",
       "size": "3059812"
     },
-    "macos-aarch64": {
+    "aarch64-macos": {
       "tarball": "https://builds.zigtools.org/zls-macos-aarch64-0.12.0.tar.xz",
       "shasum": "2e672621bfa671e25a5343b2102cd8a671bebcb7b88c9088d86eecba7bc94bac",
       "size": "913236"
     },
-    "wasi-wasm32": {
+    "wasm32-wasi": {
       "tarball": "https://builds.zigtools.org/zls-wasi-wasm32-0.12.0.tar.xz",
       "shasum": "d81151910728a5b0bd36f0d3f135ad53b6456e5ae26e211ca99fe6156631f93c",
       "size": "2235120"
