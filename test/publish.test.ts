@@ -319,7 +319,7 @@ describe("/v1/zls/publish", () => {
         `form item 'zls-version' is not a string!`,
       );
       expect(response.status).toBe(400);
-    })
+    });
 
     test("new tagged release should have full compatibility", async () => {
       const response = await sendPublish({

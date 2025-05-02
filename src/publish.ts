@@ -104,12 +104,9 @@ function expectSemverFormItem(
     return [
       null,
       null,
-      new Response(
-        `form item '${name}' is not a string!`,
-        {
-          status: 400, // Bad Request
-        },
-      ),
+      new Response(`form item '${name}' is not a string!`, {
+        status: 400, // Bad Request
+      }),
     ];
   }
 
@@ -606,7 +603,7 @@ export async function handlePublish(
     }
   }
 
-  ctx.waitUntil(Promise.all(promises))
+  ctx.waitUntil(Promise.all(promises));
 
   return new Response();
 }

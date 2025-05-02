@@ -7,26 +7,26 @@
   "name": "release-worker",
   "main": "src/index.ts",
   "compatibility_flags": ["nodejs_compat"],
-	"compatibility_date": "2025-04-28",
+  "compatibility_date": "2025-04-28",
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
 
   "d1_databases": [
     {
       "binding": "ZIGTOOLS_DB",
       "database_name": "staging-db-backend",
-      "database_id": "6c000765-1ae8-41c6-adfc-ceb068dba105"
-    }
+      "database_id": "6c000765-1ae8-41c6-adfc-ceb068dba105",
+    },
   ],
   "r2_buckets": [
     {
       "binding": "ZIGTOOLS_BUILDS",
-      "bucket_name": "zigtools-builds"
-    }
+      "bucket_name": "zigtools-builds",
+    },
   ],
   "vars": {
     "R2_PUBLIC_URL": "https://builds.zigtools.org",
-    "FORCE_MINISIGN": false
+    "FORCE_MINISIGN": false,
   },
 }
