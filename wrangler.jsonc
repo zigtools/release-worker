@@ -42,6 +42,6 @@
       "vars": {
         "FORCE_MINISIGN": true,
       },
-    }
-  }
+    },
+  },
 }
