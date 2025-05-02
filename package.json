@@ -2,29 +2,29 @@
   "name": "zigtools-release-worker",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",
+    "cf-typegen": "wrangler types --include-runtime=false --strict-vars=false",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint ."
+    "lint": "eslint"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.5.14",
-    "@cloudflare/workers-types": "^4.20240405.0",
+    "@cloudflare/vitest-pool-workers": "^0.8.19",
+    "@cloudflare/workers-types": "^4.20250430.0",
     "@eslint/js": "^9.8.0",
     "@types/eslint__js": "^8.42.3",
-    "@vitest/coverage-istanbul": "2.0.5",
+    "@vitest/coverage-istanbul": "~3.0.0",
     "eslint": "^9.8.0",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5",
     "typescript-eslint": "^8.10.0",
-    "vitest": "2.0.5",
-    "wrangler": "^3.0.0"
+    "vitest": "~3.0.7",
+    "wrangler": "^4.14.1"
   }
 }

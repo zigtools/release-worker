@@ -1,4 +1,4 @@
-import { env, SELF } from "cloudflare:test";
+import { createExecutionContext, env, SELF } from "cloudflare:test";
 import assert from "node:assert";
 import { createHash } from "node:crypto";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
@@ -152,6 +152,7 @@ describe("/v1/zls/publish", () => {
           ...env,
           API_TOKEN: value as string,
         },
+        createExecutionContext(),
       );
       expect(response.status).toBe(500);
     },
@@ -308,6 +309,17 @@ describe("/v1/zls/publish", () => {
         expect(response.status).toBe(400);
       }
     });
+
+    test("validate version form field is not a file", async () => {
+      const form = new FormData();
+      form.set("zls-version", new Blob(), "filename");
+      form.set("zig-version", "0.1.0");
+      const response = await sendPublishForm(form);
+      expect(await response.text()).toBe(
+        `form item 'zls-version' is not a string!`,
+      );
+      expect(response.status).toBe(400);
+    })
 
     test("new tagged release should have full compatibility", async () => {
       const response = await sendPublish({
@@ -995,8 +1007,9 @@ describe("/v1/zls/publish", () => {
       }),
       {
         ...env,
-        FORCE_MINISIGN: "1",
+        FORCE_MINISIGN: true,
       },
+      createExecutionContext(),
     );
 
     expect(await response.text()).toBe(
@@ -1025,8 +1038,9 @@ describe("/v1/zls/publish", () => {
       }),
       {
         ...env,
-        FORCE_MINISIGN: "1",
+        FORCE_MINISIGN: true,
       },
+      createExecutionContext(),
     );
 
     expect(await response.text()).toBe("");
@@ -1104,7 +1118,6 @@ describe("/v1/zls/publish", () => {
 
     expect(response.results).toMatchObject([
       {
-        notused: 0,
         detail:
           "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=? AND ZLSVersionMajor=? AND ZLSVersionMinor=? AND ZLSVersionPatch=?)",
       },

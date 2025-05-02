@@ -1,5 +1,4 @@
 import assert from "node:assert";
-import { Env } from "./env";
 import { Order, SemanticVersion } from "./semantic-version";
 import {
   ArtifactEntry,

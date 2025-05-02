@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import assert from "node:assert";
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, beforeAll } from "vitest";
 import {
   D2JsonData,
   ReleaseArtifact,
@@ -302,7 +302,7 @@ describe("/v1/zls/select-version", () => {
   });
 
   describe("test on sample database", () => {
-    beforeEach(populateDatabase);
+    beforeAll(populateDatabase);
 
     test("search for with Version 0.11.0", async () => {
       const response = await selectZLSVersion(
@@ -463,7 +463,6 @@ describe("/v1/zls/select-version", () => {
 
     expect(response.results).toMatchObject([
       {
-        notused: 0,
         detail:
           "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=?)",
       },
@@ -481,7 +480,6 @@ describe("/v1/zls/select-version", () => {
 
     expect(response.results).toMatchObject([
       {
-        notused: 0,
         detail:
           "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=? AND ZLSVersionMajor=? AND ZLSVersionMinor=?)",
       },
@@ -499,7 +497,6 @@ describe("/v1/zls/select-version", () => {
 
     expect(response.results).toMatchObject([
       {
-        notused: 0,
         detail:
           "SEARCH ZLSReleases USING INDEX idx_zls_releases_is_release_major_minor_patch (IsRelease=? AND ZLSVersionMajor=? AND ZLSVersionMinor=?)",
       },
@@ -517,7 +514,6 @@ describe("/v1/zls/select-version", () => {
 
     expect(response.results).toMatchObject([
       {
-        notused: 0,
         detail:
           "SEARCH ZLSReleases USING INDEX idx_zls_releases_major_minor_id_where_not_release (ZLSVersionMajor=? AND ZLSVersionMinor=?)",
       },

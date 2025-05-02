@@ -1,9 +1,8 @@
-import { Env } from "./env";
 import { handlePublish } from "./publish";
 import { handleSelectVersion } from "./select-zls-version";
 
 export default {
-  async fetch(request, env, _ctx) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return handleOptions(request);
 
     let response: Response;
@@ -15,7 +14,7 @@ export default {
       case "/v1/zls/index.json":
         return Response.redirect(`${env.R2_PUBLIC_URL}/index.json`, 301);
       case "/v1/zls/publish":
-        response = await handlePublish(request, env);
+        response = await handlePublish(request, env, ctx);
         break;
       default:
         response = new Response(null, {

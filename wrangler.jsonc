@@ -1,0 +1,32 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "release-worker",
+  "main": "src/index.ts",
+  "compatibility_flags": ["nodejs_compat"],
+	"compatibility_date": "2025-04-28",
+  "observability": {
+    "enabled": true
+  },
+
+  "d1_databases": [
+    {
+      "binding": "ZIGTOOLS_DB",
+      "database_name": "staging-db-backend",
+      "database_id": "6c000765-1ae8-41c6-adfc-ceb068dba105"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ZIGTOOLS_BUILDS",
+      "bucket_name": "zigtools-builds"
+    }
+  ],
+  "vars": {
+    "R2_PUBLIC_URL": "https://builds.zigtools.org",
+    "FORCE_MINISIGN": false
+  },
+}

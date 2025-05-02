@@ -2,7 +2,6 @@ import assert from "node:assert";
 import { Buffer } from "node:buffer";
 import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
-import { Env } from "./env";
 import {
   D2JsonData,
   Extension,
@@ -101,6 +100,19 @@ function expectSemverFormItem(
     ];
   }
 
+  if (typeof versionString !== "string") {
+    return [
+      null,
+      null,
+      new Response(
+        `form item '${name}' is not a string!`,
+        {
+          status: 400, // Bad Request
+        },
+      ),
+    ];
+  }
+
   const semver = SemanticVersion.parse(versionString);
   if (semver === null) {
     return [
@@ -129,6 +141,7 @@ function stringifyMagicNumber(magicNumber: Uint8Array): string {
 export async function handlePublish(
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("method must be 'POST'", {
@@ -158,11 +171,6 @@ export async function handlePublish(
       status: 400, // Bad Request
     });
   }
-
-  /** the return type of the `entries` function is not correct because it doesn't include `File` */
-  const formEntries = form.entries() as IterableIterator<
-    [key: string, value: string | File]
-  >;
 
   const [zlsVersionString, zlsVersion, zlsVersionResponse] =
     expectSemverFormItem(form, "zls-version");
@@ -226,6 +234,8 @@ export async function handlePublish(
       },
     );
   }
+
+  const formEntries = form.entries();
 
   const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|tar\.gz|zip)$/;
   const artifacts: ReleaseArtifact[] = [];
@@ -379,7 +389,7 @@ export async function handlePublish(
   }
 
   if (
-    env.FORCE_MINISIGN !== undefined &&
+    env.FORCE_MINISIGN &&
     artifactHasMinisign.some((hasMinisign) => !hasMinisign)
   ) {
     return new Response(`Every artifact must have a minisign file!`, {
@@ -596,7 +606,7 @@ export async function handlePublish(
     }
   }
 
-  await Promise.all(promises);
+  ctx.waitUntil(Promise.all(promises))
 
   return new Response();
 }

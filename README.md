@@ -403,7 +403,7 @@ Release artifacts can also be signed with [minisign](https://jedisct1.github.io/
 git clone https://github.com/zigtools/release-worker
 cd release-worker
 npm install
-npx wrangler d1 execute production-db-backend --local --file=./migrations/0000_initial.sql
+npx wrangler d1 execute staging-db-backend --local --file=./migrations/0000_initial.sql
 npm run dev
 ```
 
