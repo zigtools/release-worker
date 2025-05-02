@@ -39,8 +39,14 @@
           "database_id": "86dcfef4-8abd-4ff6-97a8-04c231ea2e6c",
         },
       ],
+      "r2_buckets": [
+        {
+          "binding": "ZIGTOOLS_BUILDS",
+          "bucket_name": "zigtools-builds",
+        },
+      ],
       "vars": {
-        "FORCE_MINISIGN": true,
+        "R2_PUBLIC_URL": "https://builds.zigtools.org",
       },
     },
   },
