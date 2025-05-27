@@ -1,9 +1,4 @@
-import { Buffer } from "node:buffer";
 import assert from "node:assert";
-
-export const xzMagicNumber = Buffer.from("FD377A585A00", "hex");
-export const gzipMagicNumber = Buffer.from("1F8B", "hex");
-export const zipMagicNumber = Buffer.from("504B0304", "hex");
 
 export interface D2JsonData {
   date: number;
@@ -12,7 +7,6 @@ export interface D2JsonData {
   zigVersion: string;
   minimumBuildZigVersion: string;
   minimumRuntimeZigVersion: string;
-  minisign: boolean;
   /** guarantees `testedZigVersions[zigVersion] == Compatibility.Full` */
   testedZigVersions: Record<string, VersionCompatibility>;
   artifacts: ReleaseArtifact[];
@@ -67,17 +61,6 @@ export interface SQLiteQueryPlanRow {
   parent: number;
   notused: number;
   detail: string;
-}
-
-export function getMagicNumberOfExtension(extension: Extension): Buffer {
-  switch (extension) {
-    case "tar.xz":
-      return xzMagicNumber;
-    case "tar.gz":
-      return gzipMagicNumber;
-    case "zip":
-      return zipMagicNumber;
-  }
 }
 
 export function artifactsToRecord(

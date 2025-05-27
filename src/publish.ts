@@ -1,17 +1,29 @@
 import assert from "node:assert";
 import { Buffer } from "node:buffer";
-import { pipeline } from "node:stream/promises";
-import { createHash } from "node:crypto";
 import {
+  ArtifactEntry,
   D2JsonData,
   Extension,
   ReleaseArtifact,
   VersionCompatibility,
   ZLSIndex,
   artifactsToRecord,
-  getMagicNumberOfExtension,
 } from "./shared";
 import { SemanticVersion } from "./semantic-version";
+
+export interface PublishRequest {
+  zlsVersion: string;
+  zigVersion: string;
+  minimumBuildZigVersion: string;
+  minimumRuntimeZigVersion: string;
+  compatibility: VersionCompatibility;
+  artifacts: Record<string, ArtifactMetadata>;
+}
+
+export interface ArtifactMetadata {
+  shasum: string;
+  size: number;
+}
 
 function timingSafeEqual(a: Buffer, b: Buffer): boolean {
   if (a.byteLength !== b.byteLength) return false;
@@ -84,55 +96,64 @@ function checkRequestAuthentication(
   });
 }
 
-function expectSemverFormItem(
-  form: FormData,
+const isObject = (x: unknown): x is object => typeof x == "object" && x != null;
+
+const hasField = <K extends string>(
+  x: object,
+  key: K,
+): x is Record<K, unknown> => key in x;
+
+const isValidArtifactsField = (
+  x: object,
+): x is Record<string, ArtifactMetadata> =>
+  Object.values(x).every(
+    (entry) =>
+      isObject(entry) &&
+      Object.keys(entry).length == 2 &&
+      hasField(entry, "shasum") &&
+      hasField(entry, "size") &&
+      typeof entry.shasum == "string" &&
+      typeof entry.size == "number",
+  );
+
+function expectSemverField(
+  body: object,
   name: string,
 ): [string, SemanticVersion, null] | [null, null, Response] {
-  const versionString = form.get(name);
-
-  if (versionString === null) {
+  if (!hasField(body, name)) {
     return [
       null,
       null,
-      new Response(`Missing form item '${name}'!`, {
+      new Response(`missing request field '${name}'!`, {
         status: 400, // Bad Request
       }),
     ];
   }
 
-  if (typeof versionString !== "string") {
+  if (typeof body[name] != "string") {
     return [
       null,
       null,
-      new Response(`form item '${name}' is not a string!`, {
+      new Response(`request field '${name}' is not a string!`, {
         status: 400, // Bad Request
       }),
     ];
   }
 
-  const semver = SemanticVersion.parse(versionString);
+  const semver = SemanticVersion.parse(body[name]);
   if (semver === null) {
     return [
       null,
       null,
       new Response(
-        `form item '${name}' with value '${versionString}' is not a valid version!`,
+        `request field '${name}' with value '${body[name]}' is not a valid version!`,
         {
           status: 400, // Bad Request
         },
       ),
     ];
   }
-
-  return [versionString, semver, null];
-}
-
-function stringifyMagicNumber(magicNumber: Uint8Array): string {
-  return magicNumber.reduce<string>(
-    (previous, current) =>
-      previous + (previous.length === 0 ? "" : " ") + current.toString(16),
-    "",
-  );
+  return [body[name], semver, null];
 }
 
 export async function handlePublish(
@@ -160,57 +181,76 @@ export async function handlePublish(
   );
   if (authResponse !== "ok") return authResponse;
 
-  let form: FormData;
+  let body;
   try {
-    form = await request.formData();
+    body = await request.json();
   } catch (e) {
     return new Response((e as Error).message, {
       status: 400, // Bad Request
     });
   }
 
-  const [zlsVersionString, zlsVersion, zlsVersionResponse] =
-    expectSemverFormItem(form, "zls-version");
-  if (zlsVersionResponse !== null) return zlsVersionResponse;
-
-  const [zigVersionString, zigVersion, zigVersionResponse] =
-    expectSemverFormItem(form, "zig-version");
-  if (zigVersionResponse !== null) return zigVersionResponse;
-
-  const [
-    minBuildZigVersionString,
-    _minBuildZigVersion,
-    minBuildZigVersionResponse,
-  ] = expectSemverFormItem(form, "minimum-build-zig-version");
-  if (minBuildZigVersionResponse !== null) return minBuildZigVersionResponse;
-
-  const [
-    minRuntimeZigVersionString,
-    _minRuntimeZigVersion,
-    minRuntimeZigVersionResponse,
-  ] = expectSemverFormItem(form, "minimum-runtime-zig-version");
-  if (minRuntimeZigVersionResponse !== null)
-    return minRuntimeZigVersionResponse;
-
-  const compatibility = form.get(
-    "compatibility",
-  ) as VersionCompatibility | null;
-
-  if (compatibility === null) {
-    return new Response(`Missing form item 'compatibility'!`, {
+  if (typeof body !== "object" || body == null) {
+    return new Response("request body is not a JSON object!", {
       status: 400, // Bad Request
     });
   }
 
-  const validCompatibilityValues = Object.values(VersionCompatibility);
-  if (!validCompatibilityValues.includes(compatibility)) {
+  const [zlsVersionString, zlsVersion, zlsVersionResponse] = expectSemverField(
+    body,
+    "zlsVersion",
+  );
+  if (zlsVersionResponse !== null) return zlsVersionResponse;
+
+  const [zigVersionString, zigVersion, zigVersionResponse] = expectSemverField(
+    body,
+    "zigVersion",
+  );
+  if (zigVersionResponse !== null) return zigVersionResponse;
+
+  if (
+    !hasField(body, "artifacts") ||
+    !isObject(body.artifacts) ||
+    !isValidArtifactsField(body.artifacts)
+  ) {
+    return new Response(`invalid request field 'artifacts'!`, {
+      status: 400, // Bad Request
+    });
+  }
+  const artifacts = body.artifacts;
+
+  const [minBuildZigVersionString, , minBuildZigVersionResponse] =
+    expectSemverField(body, "minimumBuildZigVersion");
+  if (minBuildZigVersionResponse !== null) return minBuildZigVersionResponse;
+
+  const [minRuntimeZigVersionString, , minRuntimeZigVersionResponse] =
+    expectSemverField(body, "minimumRuntimeZigVersion");
+  if (minRuntimeZigVersionResponse !== null)
+    return minRuntimeZigVersionResponse;
+
+  if (!hasField(body, "compatibility")) {
+    return new Response(`missing request field 'compatibility'!`, {
+      status: 400, // Bad Request
+    });
+  }
+  if (typeof body.compatibility !== "string") {
+    return new Response(`request field 'compatibility' is not a string!`, {
+      status: 400, // Bad Request
+    });
+  }
+
+  const validCompatibilityValues = Object.values(
+    VersionCompatibility,
+  ) as string[];
+  if (!validCompatibilityValues.includes(body.compatibility)) {
     return new Response(
-      `form item 'compatibility' with value '${compatibility}' must be one of ${JSON.stringify(validCompatibilityValues)}!`,
+      `request field 'compatibility' with value '${body.compatibility}' must be one of ${JSON.stringify(validCompatibilityValues)}!`,
       {
         status: 400, // Bad Request
       },
     );
   }
+  const compatibility = body.compatibility as VersionCompatibility;
 
   if (zlsVersion.isRelease && !zigVersion.isRelease) {
     return new Response(
@@ -232,47 +272,10 @@ export async function handlePublish(
     );
   }
 
-  const formEntries = form.entries();
-
   const artifactRegex = /^zls-(.*?)-(.*?)-(.*)\.(tar\.xz|tar\.gz|zip)$/;
-  const artifacts: ReleaseArtifact[] = [];
-  const artifactFiles: File[] = [];
-  const artifactMinisigns: Record<string, File | undefined> = {};
+  const releaseArtifacts: ReleaseArtifact[] = [];
 
-  for (const [key, file] of formEntries) {
-    if (key === "zig-version") continue;
-    if (key === "zls-version") continue;
-    if (key === "minimum-build-zig-version") continue;
-    if (key === "minimum-runtime-zig-version") continue;
-    if (key === "compatibility") continue;
-
-    if (typeof file === "string") {
-      return new Response(`artifact '${key}' must be encoded as a file!`, {
-        status: 400, // Bad Request
-      });
-    }
-
-    if (key !== file.name) {
-      return new Response(
-        `artifact key '${key}' must match the file name but got '${file.name}'!`,
-        {
-          status: 400, // Bad Request
-        },
-      );
-    }
-
-    if (file.size === 0) {
-      return new Response(`artifact '${key}' can't be empty!`, {
-        status: 400, // Bad Request
-      });
-    }
-
-    if (key.endsWith(".minisig")) {
-      assert(!(key in artifactMinisigns)); // keys are unique
-      artifactMinisigns[key] = file;
-      continue;
-    }
-
+  for (const [key, { shasum, size }] of Object.entries(artifacts)) {
     const match = artifactRegex.exec(key);
 
     if (match === null) {
@@ -297,18 +300,15 @@ export async function handlePublish(
       );
     }
 
-    const fileHash = createHash("sha256");
-    await pipeline(file.stream(), fileHash);
-    const fileShasum = fileHash.digest("hex");
+    if (size == 0) {
+      return new Response(`artifact '${key}' can't be empty!`, {
+        status: 400, // Bad Request
+      });
+    }
 
-    const expectedMagicNumber = getMagicNumberOfExtension(extension);
-    const actualMagicNumber: Uint8Array = new Uint8Array(
-      await file.slice(0, expectedMagicNumber.byteLength).arrayBuffer(),
-    );
-
-    if (!expectedMagicNumber.equals(actualMagicNumber)) {
+    if (shasum.length != 64 || Buffer.from(shasum, "hex").length != 32) {
       return new Response(
-        `artifact '${key}' should have the magic number ${stringifyMagicNumber(expectedMagicNumber)} but got ${stringifyMagicNumber(actualMagicNumber)}!`,
+        `artifact '${key}' has an invalid shasum '${shasum}'`,
         {
           status: 400, // Bad Request
         },
@@ -316,26 +316,23 @@ export async function handlePublish(
     }
 
     // console.log(
-    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${fileShasum}, size=${file.size.toString()}`,
+    //   `os=${os}, arch=${arch}, version=${version}, extension=${extension}, shasum=${shasum}, size=${size.toString()}`,
     // );
 
-    artifactFiles.push(file);
-
-    artifacts.push({
+    releaseArtifacts.push({
       os: os,
       arch: arch,
       version: version,
       extension: extension,
-      fileShasum: fileShasum,
-      fileSize: file.size,
+      fileShasum: shasum,
+      fileSize: size,
     });
   }
-  assert(artifacts.length == artifactFiles.length);
 
   /** key is is the artifact file name without the extension */
   const groupedArtifacts: Record<string, ReleaseArtifact[]> = {};
 
-  for (const artifact of artifacts) {
+  for (const artifact of releaseArtifacts) {
     const key = `zls-${artifact.os}-${artifact.arch}-${artifact.version}`;
     if (key in groupedArtifacts) {
       groupedArtifacts[key].push(artifact);
@@ -367,46 +364,7 @@ export async function handlePublish(
     );
   }
 
-  const artifactHasMinisign = Array<boolean>(artifacts.length).fill(false);
-
-  for (const minisignFileName of Object.keys(artifactMinisigns)) {
-    const artifactIndex = artifactFiles.findIndex(
-      (file) => `${file.name}.minisig` == minisignFileName,
-    );
-    if (artifactIndex === -1) {
-      return new Response(
-        `minisign file '${minisignFileName}' has not matching artifact!`,
-        {
-          status: 400, // Bad Request
-        },
-      );
-    }
-    assert(!artifactHasMinisign[artifactIndex]); // keys are unique
-    artifactHasMinisign[artifactIndex] = true;
-  }
-
-  if (
-    env.FORCE_MINISIGN &&
-    artifactHasMinisign.some((hasMinisign) => !hasMinisign)
-  ) {
-    return new Response(`Every artifact must have a minisign file!`, {
-      status: 400, // Bad Request
-    });
-  }
-
-  if (
-    artifactHasMinisign.length !== 0 &&
-    !artifactHasMinisign.every((value) => value === artifactHasMinisign[0])
-  ) {
-    return new Response(
-      `Either, every artifact has a minisign file, or none!`,
-      {
-        status: 400, // Bad Request
-      },
-    );
-  }
-
-  if (zlsVersion.isRelease && artifacts.length === 0) {
+  if (zlsVersion.isRelease && releaseArtifacts.length === 0) {
     return new Response(`A new tagged release of ZLS must have artifacts!`, {
       status: 400, // Bad Request
     });
@@ -428,11 +386,11 @@ export async function handlePublish(
   }
 
   if (
-    (artifacts.length === 0) !=
+    (releaseArtifacts.length === 0) !=
     (compatibility === VersionCompatibility.None)
   ) {
     return new Response(
-      `A ${artifacts.length === 0 ? "failed" : "successfull"} ZLS build can't have '${compatibility}' as its version compatibility!`,
+      `A ${releaseArtifacts.length === 0 ? "failed" : "successfull"} ZLS build can't have '${compatibility}' as its version compatibility!`,
       {
         status: 400, // Bad Request
       },
@@ -440,17 +398,22 @@ export async function handlePublish(
   }
 
   if (
-    artifacts.length !== 0 &&
-    !artifacts.every((artifact) => artifact.version === artifacts[0].version)
+    releaseArtifacts.length !== 0 &&
+    !releaseArtifacts.every(
+      (artifact) => artifact.version === releaseArtifacts[0].version,
+    )
   ) {
     return new Response(`all artifacts must have the same version!`, {
       status: 400, // Bad Request
     });
   }
 
-  if (artifacts.length !== 0 && artifacts[0].version != zlsVersionString) {
+  if (
+    releaseArtifacts.length !== 0 &&
+    releaseArtifacts[0].version != zlsVersionString
+  ) {
     return new Response(
-      `ZLS version is '${zlsVersionString}' but all artifacts have the version '${artifacts[0].version}'`,
+      `ZLS version is '${zlsVersionString}' but all artifacts have the version '${releaseArtifacts[0].version}'`,
       {
         status: 400, // Bad Request
       },
@@ -459,16 +422,15 @@ export async function handlePublish(
 
   const newEntryValue: D2JsonData = {
     date: Date.now(),
-    artifacts: artifacts,
+    artifacts: releaseArtifacts,
     zlsVersion: zlsVersionString,
     zigVersion: zigVersionString,
     minimumBuildZigVersion: minBuildZigVersionString,
     minimumRuntimeZigVersion: minRuntimeZigVersionString,
-    minisign: Object.keys(artifactMinisigns).length !== 0,
     testedZigVersions: {},
   };
 
-  if (artifacts.length === 0) {
+  if (releaseArtifacts.length === 0) {
     const result = await env.ZIGTOOLS_DB.prepare(
       "SELECT * FROM ZLSReleases WHERE ZLSVersion = ?1",
     )
@@ -576,31 +538,6 @@ export async function handlePublish(
         },
       ),
     );
-  }
-
-  for (let i = 0; i < artifacts.length; i++) {
-    const artifact = artifacts[i];
-    const file = artifactFiles[i];
-    const minisignFile = artifactMinisigns[`${file.name}.minisig`];
-
-    promises.push(
-      env.ZIGTOOLS_BUILDS.put(file.name, file, {
-        httpMetadata: {
-          cacheControl: "max-age=31536000",
-        },
-        sha256: artifact.fileShasum,
-      }),
-    );
-
-    if (minisignFile !== undefined) {
-      promises.push(
-        env.ZIGTOOLS_BUILDS.put(minisignFile.name, minisignFile, {
-          httpMetadata: {
-            cacheControl: "max-age=31536000",
-          },
-        }),
-      );
-    }
   }
 
   ctx.waitUntil(Promise.all(promises));

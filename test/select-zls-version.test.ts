@@ -52,7 +52,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.9.0-dev.20+aaaaaaaaa",
     minimumBuildZigVersion: "0.9.0-dev.25+aaaaaaaaa",
     minimumRuntimeZigVersion: "0.9.0-dev.15+aaaaaaaaa",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: {
       "0.9.0-dev.20+aaaaaaaaa": VersionCompatibility.Full,
@@ -66,7 +65,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.11.0",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.11.0",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: { "0.11.0": VersionCompatibility.Full },
   },
@@ -76,7 +74,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.11.0",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.11.0",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: {
       "0.11.0": VersionCompatibility.Full,
@@ -92,7 +89,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0-dev.7+aaaaaaaaa",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.12.0-dev.7+aaaaaaaaa",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: {
       "0.12.0-dev.7+aaaaaaaaa": VersionCompatibility.Full,
@@ -107,7 +103,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0-dev.17+aaaaaaaaa",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.12.0-dev.14+aaaaaaaaa",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: {
       "0.12.0-dev.17+aaaaaaaaa": VersionCompatibility.Full,
@@ -119,7 +114,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0",
     minimumBuildZigVersion: "0.12.0",
     minimumRuntimeZigVersion: "0.12.0",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: {
       "0.12.0": VersionCompatibility.Full,
@@ -133,7 +127,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0",
     minimumBuildZigVersion: "0.12.0",
     minimumRuntimeZigVersion: "0.12.0",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: { "0.12.0": VersionCompatibility.Full },
   },
@@ -143,7 +136,6 @@ const samples: D2JsonData[] = [
     zigVersion: "0.13.0",
     minimumBuildZigVersion: "0.13.0",
     minimumRuntimeZigVersion: "0.13.0",
-    minisign: false,
     artifacts: defaultArtifacts,
     testedZigVersions: {
       "0.13.0": VersionCompatibility.Full,

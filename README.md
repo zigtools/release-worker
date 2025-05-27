@@ -17,9 +17,11 @@ All artifacts are signed with [minisign](https://jedisct1.github.io/minisign/) u
 RWR+9B91GBZ0zOjh6Lr17+zKf5BoSuFvrx2xSeDE57uIYvnKBGmMjOex
 ```
 
+The signature file can be found by appending `.minisig` to the artifact file URI.
+
 ## /v1/zls/select-version
 
-Will respond with metadata about a ZLS build that is useable with the given Zig version.
+Will respond with metadata about a ZLS build that is usable with the given Zig version.
 The response body is similar to Zig's [index.json](https://ziglang.org/download/index.json).
 
 ### Query Parameters
@@ -458,21 +460,20 @@ The [index.json](https://builds.zigtools.org/index.json) imitates Zig's [index.j
 > [!IMPORTANT]
 > This request is only intended to be used by ZLS's GitHub CI.
 
-The body is a `multipart/form-data` with the following key value pairs:
+The body is a JSON object with the following fields:
 
-- `zls-version`: The ZLS version which must be a semantic version
-- `zig-version`: The Zig version which must be a semantic version
-- `minimum-build-zig-version`: The minimum Zig version that is required to compile and test ZLS
-- `minimum-runtime-zig-version`: The minimum Zig version that is required to run ZLS
+- `zlsVersion`: The ZLS version which must be a semantic version
+- `zigVersion`: The Zig version which must be a semantic version
+- `minimumBuildZigVersion`: The minimum Zig version that is required to compile and test ZLS
+- `minimumRuntimeZigVersion`: The minimum Zig version that is required to run ZLS
 - `compatibility`: Describes how compatible the Zig and ZLS version are (valid values: `"none"`, `"only-runtime"`, `"full"`)
+- `artifacts`: A `Map<string, { shasum: string; size: number }>`. `shasum` is the sha256 has of the file and `size` is the size of the file in bytes.
 
-All other fields are interpreted as release artifacts. The key must have the following format:
+The key of `artifacts` is the file name of a release artifact with the following format:
 
 `zls-${OS}-${ARCH}-${ZLS_VERSION}.(tar.xz|tar.gz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
 
 Artifacts that target windows must be `.zip` files. All other non windows targets must include `.tar.xz` **and** `.tar.gz`.
-
-Release artifacts can also be signed with [minisign](https://jedisct1.github.io/minisign/) by publishing an additional `.minisig` file for every artifact. (Example: `zls-linux-x86_64-0.1.0.tar.xz.minisig`)
 
 ## Development
 
@@ -489,5 +490,6 @@ npm run dev
 # Publish a ZLS release (Requires `tar` and `7z`)
 git clone https://github.com/zigtools/zls
 cd zls
-ZLS_WORKER_ENDPOINT=http://localhost:8787 zig build publish --summary all
+zig build release
+ZLS_WORKER_ENDPOINT=http://localhost:8787 zig run .github/workflows/publish_release.zig
 ```

@@ -1,19 +1,17 @@
 import { createExecutionContext, env, SELF } from "cloudflare:test";
 import assert from "node:assert";
-import { createHash } from "node:crypto";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
   D2JsonData,
-  Extension,
-  getMagicNumberOfExtension,
-  gzipMagicNumber,
   SQLiteQueryPlanRow,
   VersionCompatibility,
-  xzMagicNumber,
-  zipMagicNumber,
   ZLSIndex,
 } from "../src/shared";
-import { handlePublish } from "../src/publish";
+import {
+  ArtifactMetadata,
+  handlePublish,
+  PublishRequest,
+} from "../src/publish";
 
 async function searchZLSRelease(
   zlsVersion: string,
@@ -27,13 +25,14 @@ async function searchZLSRelease(
   return JSON.parse(jsonString) as D2JsonData;
 }
 
-async function sendPublishForm(form: FormData): Promise<Response> {
+async function sendPublishForm(body: PublishRequest): Promise<Response> {
   assert(typeof env.API_TOKEN === "string" && env.API_TOKEN);
   return await SELF.fetch(
     new Request("https://example.com/v1/zls/publish", {
-      body: form,
+      body: JSON.stringify(body),
       method: "POST",
       headers: {
+        "content-type": "application/json;charset=UTF-8",
         Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
       },
     }),
@@ -47,26 +46,23 @@ async function sendPublish({
   minimumRuntimeZigVersion,
   compatibility,
   artifacts,
-  withMinisign,
 }: {
   zlsVersion: string;
   zigVersion: string;
   minimumBuildZigVersion?: string;
   minimumRuntimeZigVersion?: string;
   compatibility?: VersionCompatibility;
-  artifacts: [fileName: string, file: Blob][];
-  withMinisign?: boolean;
+  artifacts: Record<string, ArtifactMetadata>;
 }): Promise<Response> {
-  const form = initPublishForm({
+  const body = initPublishForm({
     zlsVersion,
     zigVersion,
     minimumBuildZigVersion,
     minimumRuntimeZigVersion,
     compatibility,
     artifacts,
-    withMinisign,
   });
-  return await sendPublishForm(form);
+  return await sendPublishForm(body);
 }
 
 function initPublishForm({
@@ -76,62 +72,52 @@ function initPublishForm({
   minimumRuntimeZigVersion,
   compatibility,
   artifacts,
-  withMinisign,
 }: {
   zlsVersion: string;
   zigVersion: string;
   minimumBuildZigVersion?: string;
   minimumRuntimeZigVersion?: string;
   compatibility?: VersionCompatibility;
-  artifacts: [fileName: string, file: Blob][];
-  withMinisign?: boolean;
-}): FormData {
-  const form = new FormData();
-  form.set("zls-version", zlsVersion);
-  form.set("zig-version", zigVersion);
-  form.set("minimum-build-zig-version", minimumBuildZigVersion ?? zigVersion);
-  form.set(
-    "minimum-runtime-zig-version",
-    minimumRuntimeZigVersion ?? zigVersion,
-  );
-  form.set(
-    "compatibility",
-    compatibility ??
-      (artifacts.length === 0
+  artifacts: Record<string, ArtifactMetadata>;
+}): PublishRequest {
+  return {
+    zlsVersion: zlsVersion,
+    zigVersion: zigVersion,
+    minimumBuildZigVersion: minimumBuildZigVersion ?? zigVersion,
+    minimumRuntimeZigVersion: minimumRuntimeZigVersion ?? zigVersion,
+    compatibility:
+      compatibility ??
+      (Object.keys(artifacts).length === 0
         ? VersionCompatibility.None
         : VersionCompatibility.Full),
-  );
-  for (const [fileName, file] of artifacts) {
-    assert(!form.has(fileName));
-    form.set(fileName, file, fileName);
-    if (withMinisign ?? false) {
-      const minisignFileName = `${fileName}.minisig`;
-      assert(!form.has(minisignFileName));
-      form.set(
-        minisignFileName,
-        new Blob([
-          "something... signature, something... hash, something... crypto",
-        ]),
-        minisignFileName,
-      );
-    }
-  }
-  return form;
+    artifacts,
+  };
 }
 
-function getSampleArtifacts(
-  zlsVersion: string,
-): [fileName: string, file: Blob][] {
-  return [
-    [
-      `zls-linux-x86_64-${zlsVersion}.tar.xz`,
-      new Blob([xzMagicNumber, "binary1"]),
-    ],
-    [
-      `zls-linux-x86_64-${zlsVersion}.tar.gz`,
-      new Blob([gzipMagicNumber, "binary2"]),
-    ],
-  ];
+function getSampleArtifact(
+  fileName: string,
+  shasum?: string,
+  size?: number,
+): Record<string, ArtifactMetadata> {
+  return {
+    [fileName]: {
+      shasum: shasum ?? "a".repeat(64),
+      size: size ?? 1,
+    },
+  };
+}
+
+function getSampleArtifacts(version: string): Record<string, ArtifactMetadata> {
+  return {
+    [`zls-linux-x86_64-${version}.tar.xz`]: {
+      shasum: "a".repeat(64),
+      size: 1,
+    },
+    [`zls-linux-x86_64-${version}.tar.gz`]: {
+      shasum: "b".repeat(64),
+      size: 2,
+    },
+  };
 }
 
 describe("/v1/zls/publish", () => {
@@ -236,23 +222,111 @@ describe("/v1/zls/publish", () => {
   });
 
   describe("validate request body", () => {
+    test("body is not a json", async () => {
+      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
+        body: null,
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
+        },
+      });
+      expect(await response.text()).toBe(`Unexpected end of JSON input`);
+      expect(response.status).toBe(400);
+    });
+
+    test("body is not a JSON object", async () => {
+      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
+        body: JSON.stringify(5),
+        method: "POST",
+        headers: {
+          "content-type": "application/json;charset=UTF-8",
+          Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
+        },
+      });
+      expect(await response.text()).toBe(`request body is not a JSON object!`);
+      expect(response.status).toBe(400);
+    });
+
     test.each<string>([
-      "zig-version",
-      "zls-version",
-      "minimum-build-zig-version",
-      "minimum-runtime-zig-version",
+      "zigVersion",
+      "zlsVersion",
+      "minimumBuildZigVersion",
+      "minimumRuntimeZigVersion",
       "compatibility",
     ])("missing '%s' field", async (fieldName) => {
-      const form = new FormData();
-      form.set("zls-version", "0.1.0");
-      form.set("zig-version", "0.1.0");
-      form.set("minimum-build-zig-version", "0.1.0");
-      form.set("minimum-runtime-zig-version", "0.1.0");
-      form.set("compatibility", VersionCompatibility.Full);
-      form.delete(fieldName);
-      const response = await sendPublishForm(form);
-      expect(await response.text()).toBe(`Missing form item '${fieldName}'!`);
+      const body: Record<string, unknown> = {
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        minimumBuildZigVersion: "0.1.0",
+        minimumRuntimeZigVersion: "0.1.0",
+        compatibility: VersionCompatibility.Full,
+        artifacts: {},
+      } satisfies PublishRequest;
+      const { [fieldName]: _, ...newBody } = body;
+      const response = await sendPublishForm(
+        newBody as unknown as PublishRequest,
+      );
+      expect(await response.text()).toBe(
+        `missing request field '${fieldName}'!`,
+      );
       expect(response.status).toBe(400);
+    });
+
+    test.each<string>([
+      "zigVersion",
+      "zlsVersion",
+      "minimumBuildZigVersion",
+      "minimumRuntimeZigVersion",
+      "compatibility",
+    ])("field '%s' is not a string", async (fieldName) => {
+      const body: Record<string, unknown> = {
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        minimumBuildZigVersion: "0.1.0",
+        minimumRuntimeZigVersion: "0.1.0",
+        compatibility: VersionCompatibility.Full,
+        artifacts: {},
+      } satisfies PublishRequest;
+      body[fieldName] = 5;
+      const response = await sendPublishForm(body as unknown as PublishRequest);
+      expect(await response.text()).toBe(
+        `request field '${fieldName}' is not a string!`,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    test.each<[unknown, "ok" | "bad"]>([
+      [{}, "ok"],
+      [{ name: { shasum: "", size: 1 } }, "ok"],
+      [{ name: { shasum: "", size: 1, unknown: "unknown" } }, "bad"],
+      [{ name: { shasum: "", size: "" } }, "bad"],
+      [{ name: { shasum: 5, size: 1 } }, "bad"],
+      [{ name: { shasum: "" } }, "bad"],
+      [{ name: { size: 1 } }, "bad"],
+      [{ name: {} }, "bad"],
+      [{ name: { unknown: "unknown" } }, "bad"],
+      [5, "bad"],
+      [undefined, "bad"],
+    ])("validate artifacts field %j", async (value, status) => {
+      const body: PublishRequest = {
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        minimumBuildZigVersion: "0.1.0",
+        minimumRuntimeZigVersion: "0.1.0",
+        compatibility: VersionCompatibility.Full,
+        artifacts: value as Record<string, ArtifactMetadata>,
+      };
+      const response = await sendPublishForm(body);
+      if (status == "ok") {
+        expect(await response.text()).not.toBe(
+          `invalid request field 'artifacts'!`,
+        );
+      } else {
+        expect(await response.text()).toBe(
+          `invalid request field 'artifacts'!`,
+        );
+        expect(response.status).toBe(400);
+      }
     });
 
     test("response should be empty body", async () => {
@@ -282,7 +356,7 @@ describe("/v1/zls/publish", () => {
         expect(response.status).toBe(200);
       } else {
         expect(await response.text()).toBe(
-          `form item 'zls-version' with value '${zlsVersion}' is not a valid version!`,
+          `request field 'zlsVersion' with value '${zlsVersion}' is not a valid version!`,
         );
         expect(response.status).toBe(400);
       }
@@ -304,22 +378,50 @@ describe("/v1/zls/publish", () => {
         expect(response.status).toBe(200);
       } else {
         expect(await response.text()).toBe(
-          `form item 'zig-version' with value '${zigVersion}' is not a valid version!`,
+          `request field 'zigVersion' with value '${zigVersion}' is not a valid version!`,
         );
         expect(response.status).toBe(400);
       }
     });
 
-    test("validate version form field is not a file", async () => {
-      const form = new FormData();
-      form.set("zls-version", new Blob(), "filename");
-      form.set("zig-version", "0.1.0");
-      const response = await sendPublishForm(form);
+    test("validate artifact size", async () => {
+      const response = await sendPublish({
+        zlsVersion: "0.1.0",
+        zigVersion: "0.1.0",
+        artifacts: {
+          "zls-linux-x86_64-0.1.0.tar.xz": {
+            shasum: "a".repeat(64),
+            size: 0,
+          },
+        },
+        compatibility: VersionCompatibility.OnlyRuntime,
+      });
+
       expect(await response.text()).toBe(
-        `form item 'zls-version' is not a string!`,
+        "artifact 'zls-linux-x86_64-0.1.0.tar.xz' can't be empty!",
       );
       expect(response.status).toBe(400);
     });
+
+    test.each<string>(["", "a", "z".repeat(64)])(
+      "validate artifact shasum '%s'",
+      async (shasum) => {
+        const response = await sendPublish({
+          zlsVersion: "0.1.0",
+          zigVersion: "0.1.0",
+          artifacts: {
+            "zls-windows-x86_64-0.1.0.zip": {
+              shasum: shasum,
+              size: 1,
+            },
+          },
+        });
+        expect(await response.text()).toBe(
+          `artifact 'zls-windows-x86_64-0.1.0.zip' has an invalid shasum '${shasum}'`,
+        );
+        expect(response.status).toBe(400);
+      },
+    );
 
     test("new tagged release should have full compatibility", async () => {
       const response = await sendPublish({
@@ -391,7 +493,7 @@ describe("/v1/zls/publish", () => {
           artifacts:
             kind === "successfull"
               ? getSampleArtifacts("0.1.0-dev.1+aaaaaaaaa")
-              : [],
+              : {},
           compatibility: compatibilityString as
             | VersionCompatibility
             | undefined,
@@ -412,124 +514,6 @@ describe("/v1/zls/publish", () => {
       },
     );
 
-    test.each<[Extension, Uint8Array, "ok" | "bad"]>([
-      ["tar.xz", new Uint8Array(xzMagicNumber), "ok"],
-      ["tar.xz", new Uint8Array(gzipMagicNumber), "bad"],
-      ["tar.xz", new Uint8Array(zipMagicNumber), "bad"],
-      ["tar.xz", new Uint8Array([1, 2, 3, 4]), "bad"],
-
-      ["tar.gz", new Uint8Array(gzipMagicNumber), "ok"],
-      ["tar.gz", new Uint8Array(xzMagicNumber), "bad"],
-      ["tar.gz", new Uint8Array(zipMagicNumber), "bad"],
-      ["tar.gz", new Uint8Array([1, 2, 3, 4]), "bad"],
-
-      ["zip", new Uint8Array(zipMagicNumber), "ok"],
-      ["zip", new Uint8Array(xzMagicNumber), "bad"],
-      ["zip", new Uint8Array(gzipMagicNumber), "bad"],
-      ["zip", new Uint8Array([1, 2, 3, 4]), "bad"],
-    ])(
-      "file magic number: '%s' %s -> %s",
-      async (extension, body, expected) => {
-        let artifacts: [fileName: string, file: Blob][];
-        switch (extension) {
-          case "tar.xz":
-            artifacts = [
-              ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([body])],
-              [
-                "zls-linux-x86_64-0.1.0.tar.gz",
-                new Blob([gzipMagicNumber, "binary1"]),
-              ],
-            ];
-            break;
-          case "tar.gz":
-            artifacts = [
-              [
-                "zls-linux-x86_64-0.1.0.tar.xz",
-                new Blob([xzMagicNumber, "binary1"]),
-              ],
-              ["zls-linux-x86_64-0.1.0.tar.gz", new Blob([body])],
-            ];
-            break;
-          case "zip":
-            artifacts = [["zls-windows-x86_64-0.1.0.zip", new Blob([body])]];
-            break;
-        }
-        const response = await sendPublish({
-          zlsVersion: "0.1.0",
-          zigVersion: "0.1.0",
-          artifacts: artifacts,
-        });
-
-        if (expected === "ok") {
-          expect(await response.text()).toBe("");
-          expect(response.status).toBe(200);
-        } else {
-          expect(await response.text()).contains(
-            `should have the magic number`,
-          );
-          expect(response.status).toBe(400);
-        }
-      },
-    );
-
-    test("artifact should be a file", async () => {
-      const form = new FormData();
-      form.set("zls-version", "0.1.0");
-      form.set("zig-version", "0.1.0");
-      form.set("minimum-build-zig-version", "0.1.0");
-      form.set("minimum-runtime-zig-version", "0.1.0");
-      form.set("compatibility", VersionCompatibility.Full);
-      form.set("zls-linux-x86_64-0.1.0.tar.xz", "foo");
-      const response = await sendPublishForm(form);
-      expect(await response.text()).toBe(
-        `artifact 'zls-linux-x86_64-0.1.0.tar.xz' must be encoded as a file!`,
-      );
-      expect(response.status).toBe(400);
-    });
-
-    test("artifact file name should match form key", async () => {
-      const form = new FormData();
-      form.set("zls-version", "0.1.0");
-      form.set("zig-version", "0.1.0");
-      form.set("minimum-build-zig-version", "0.1.0");
-      form.set("minimum-runtime-zig-version", "0.1.0");
-      form.set("compatibility", VersionCompatibility.Full);
-      form.set(
-        "zls-linux-x86_64-0.1.0.tar.xz",
-        new Blob([xzMagicNumber, "foo"]),
-        "zls-windows-aarch64-0.1.0.zip",
-      );
-      const response = await sendPublishForm(form);
-      expect(await response.text()).toBe(
-        `artifact key 'zls-linux-x86_64-0.1.0.tar.xz' must match the file name but got 'zls-windows-aarch64-0.1.0.zip'!`,
-      );
-      expect(response.status).toBe(400);
-    });
-
-    test("artifact should not be empty", async () => {
-      const response = await sendPublish({
-        zlsVersion: "0.1.0",
-        zigVersion: "0.1.0",
-        artifacts: [["zls-linux-x86_64-0.1.0.tar.xz", new Blob()]],
-      });
-      expect(await response.text()).toBe(
-        "artifact 'zls-linux-x86_64-0.1.0.tar.xz' can't be empty!",
-      );
-      expect(response.status).toBe(400);
-    });
-
-    test("validate file magic number response body", async () => {
-      const response = await sendPublish({
-        zlsVersion: "0.1.0",
-        zigVersion: "0.1.0",
-        artifacts: [["zls-linux-x86_64-0.1.0.tar.xz", new Blob(["binary1"])]],
-      });
-      expect(await response.text()).toBe(
-        "artifact 'zls-linux-x86_64-0.1.0.tar.xz' should have the magic number fd 37 7a 58 5a 0 but got 62 69 6e 61 72 79!",
-      );
-      expect(response.status).toBe(400);
-    });
-
     test.each<[string, "ok" | "bad"]>([
       ["", "bad"],
       ["some string", "bad"],
@@ -542,24 +526,22 @@ describe("/v1/zls/publish", () => {
       ["zls-linux-x86_64-0.1.0.tar.gz", "ok"],
       ["zls-windows-aarch64-0.1.0.zip", "ok"],
     ])("validate artifact string: %j -> %s", async (filename, expected) => {
-      let artifacts: [fileName: string, file: Blob][];
+      let artifacts: Record<string, ArtifactMetadata>;
       if (filename.endsWith("zip")) {
-        artifacts = [[filename, new Blob([zipMagicNumber, "binary1"])]];
+        artifacts = getSampleArtifact(filename);
       } else {
-        artifacts = [
-          [
+        artifacts = {
+          ...getSampleArtifact(
             filename.endsWith("xz")
               ? filename
               : "zls-linux-x86_64-0.1.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-          [
+          ),
+          ...getSampleArtifact(
             filename.endsWith("xz")
               ? "zls-linux-x86_64-0.1.0.tar.gz"
               : filename,
-            new Blob([gzipMagicNumber, "binary1"]),
-          ],
-        ];
+          ),
+        };
       }
 
       const response = await sendPublish({
@@ -580,20 +562,20 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.1.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-          [
-            "zls-linux-x86_64-0.1.0.tar.gz",
-            new Blob([gzipMagicNumber, "binary2"]),
-          ],
-          [
-            "zls-windows-x86_64-0.2.0.zip",
-            new Blob([zipMagicNumber, "binary3"]),
-          ],
-        ],
+        artifacts: {
+          "zls-linux-x86_64-0.1.0.tar.xz": {
+            shasum: "a".repeat(64),
+            size: 1,
+          },
+          "zls-linux-x86_64-0.1.0.tar.gz": {
+            shasum: "b".repeat(64),
+            size: 2,
+          },
+          "zls-windows-x86_64-0.2.0.zip": {
+            shasum: "c".repeat(64),
+            size: 3,
+          },
+        },
       });
       expect(await response.text()).toBe(
         "all artifacts must have the same version!",
@@ -617,9 +599,7 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          ["zls-linux-x86_64-0.1.0.zip", new Blob([zipMagicNumber, "binary1"])],
-        ],
+        artifacts: getSampleArtifact("zls-linux-x86_64-0.1.0.zip"),
       });
       expect(await response.text()).toBe(
         `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip"]!`,
@@ -631,12 +611,7 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          [
-            "zls-windows-x86_64-0.1.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-        ],
+        artifacts: getSampleArtifact("zls-windows-x86_64-0.1.0.tar.xz"),
       });
       expect(await response.text()).toBe(
         `artifact extensions of 'zls-windows-x86_64-0.1.0.*' must be ["zip"] but found ["tar.xz"]!`,
@@ -678,12 +653,12 @@ describe("/v1/zls/publish", () => {
         `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip","tar.xz","tar.gz"]!`,
       ],
     ])("invalid artifact extensions: %j", async (extensions, expectedError) => {
-      const artifacts: [fileName: string, file: Blob][] = [];
+      const artifacts: Record<string, ArtifactMetadata> = {};
       for (const extension of extensions) {
-        artifacts.push([
-          `zls-linux-x86_64-0.1.0.${extension}`,
-          new Blob([getMagicNumberOfExtension(extension), "binary1"]),
-        ]);
+        artifacts[`zls-linux-x86_64-0.1.0.${extension}`] = {
+          shasum: "a".repeat(64),
+          size: 1,
+        };
       }
 
       const response = await sendPublish({
@@ -700,9 +675,7 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0",
         zigVersion: "0.1.0",
-        artifacts: [
-          ["zls-linux-x86_64-0.1.0.zip", new Blob([zipMagicNumber, "binary1"])],
-        ],
+        artifacts: getSampleArtifact("zls-linux-x86_64-0.1.0.zip"),
       });
       expect(await response.text()).toBe(
         `artifact extensions of 'zls-linux-x86_64-0.1.0.*' must be ["tar.xz","tar.gz"] but found ["zip"]!`,
@@ -771,17 +744,20 @@ describe("/v1/zls/publish", () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0",
       zigVersion: "0.1.1",
-      artifacts: [
-        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
-        [
-          "zls-linux-x86_64-0.1.0.tar.gz",
-          new Blob([gzipMagicNumber, "binary2"]),
-        ],
-        [
-          "zls-windows-aarch64-0.1.0.zip",
-          new Blob([zipMagicNumber, "binary3"]),
-        ],
-      ],
+      artifacts: {
+        "zls-linux-x86_64-0.1.0.tar.xz": {
+          shasum: "a".repeat(64),
+          size: 1,
+        },
+        "zls-linux-x86_64-0.1.0.tar.gz": {
+          shasum: "b".repeat(64),
+          size: 2,
+        },
+        "zls-windows-aarch64-0.1.0.zip": {
+          shasum: "c".repeat(64),
+          size: 3,
+        },
+      },
     });
 
     expect(await response.text()).toBe("");
@@ -794,7 +770,6 @@ describe("/v1/zls/publish", () => {
       zigVersion: "0.1.1",
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
-      minisign: false,
       testedZigVersions: {
         "0.1.1": VersionCompatibility.Full,
       },
@@ -804,166 +779,34 @@ describe("/v1/zls/publish", () => {
           os: "linux",
           version: "0.1.0",
           extension: "tar.xz",
-          fileShasum: createHash("sha256")
-            .update(xzMagicNumber)
-            .update("binary1")
-            .digest("hex"),
-          fileSize: xzMagicNumber.length + 7,
+          fileShasum: "a".repeat(64),
+          fileSize: 1,
         },
         {
           arch: "x86_64",
           os: "linux",
           version: "0.1.0",
           extension: "tar.gz",
-          fileShasum: createHash("sha256")
-            .update(gzipMagicNumber)
-            .update("binary2")
-            .digest("hex"),
-          fileSize: gzipMagicNumber.length + 7,
+          fileShasum: "b".repeat(64),
+          fileSize: 2,
         },
         {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0",
           extension: "zip",
-          fileShasum: createHash("sha256")
-            .update(zipMagicNumber)
-            .update("binary3")
-            .digest("hex"),
-          fileSize: zipMagicNumber.length + 7,
+          fileShasum: "c".repeat(64),
+          fileSize: 3,
         },
       ],
     });
-
-    const objects = await env.ZIGTOOLS_BUILDS.list({});
-
-    expect(objects.objects).toMatchObject([
-      {
-        key: "index.json",
-      },
-      {
-        key: "zls-linux-x86_64-0.1.0.tar.gz",
-        size: gzipMagicNumber.length + 7,
-      },
-      {
-        key: "zls-linux-x86_64-0.1.0.tar.xz",
-        size: xzMagicNumber.length + 7,
-      },
-      {
-        key: "zls-windows-aarch64-0.1.0.zip",
-        size: zipMagicNumber.length + 7,
-      },
-    ]);
-
-    assert(objects.objects[1].checksums.sha256 !== undefined);
-    assert(objects.objects[2].checksums.sha256 !== undefined);
-    assert(objects.objects[3].checksums.sha256 !== undefined);
-
-    expect(
-      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
-    ).toBe(
-      createHash("sha256")
-        .update(gzipMagicNumber)
-        .update("binary2")
-        .digest("hex"),
-    );
-    expect(
-      Buffer.from(objects.objects[2].checksums.sha256).toString("hex"),
-    ).toBe(
-      createHash("sha256")
-        .update(xzMagicNumber)
-        .update("binary1")
-        .digest("hex"),
-    );
-    expect(
-      Buffer.from(objects.objects[3].checksums.sha256).toString("hex"),
-    ).toBe(
-      createHash("sha256")
-        .update(zipMagicNumber)
-        .update("binary3")
-        .digest("hex"),
-    );
-  });
-
-  test("publish new successfull build with minisign", async () => {
-    const date = Date.now();
-    vi.setSystemTime(date);
-
-    const response = await sendPublish({
-      zlsVersion: "0.1.0",
-      zigVersion: "0.1.1",
-      artifacts: getSampleArtifacts("0.1.0"),
-      withMinisign: true,
-    });
-
-    expect(await response.text()).toBe("");
-    expect(response.status).toBe(200);
-
-    const jsonData = await searchZLSRelease("0.1.0");
-    expect(jsonData).toStrictEqual<D2JsonData>({
-      date: date,
-      zlsVersion: "0.1.0",
-      zigVersion: "0.1.1",
-      minimumBuildZigVersion: "0.1.1",
-      minimumRuntimeZigVersion: "0.1.1",
-      minisign: true,
-      testedZigVersions: {
-        "0.1.1": VersionCompatibility.Full,
-      },
-      artifacts: [
-        {
-          arch: "x86_64",
-          os: "linux",
-          version: "0.1.0",
-          extension: "tar.xz",
-          fileShasum: createHash("sha256")
-            .update(xzMagicNumber)
-            .update("binary1")
-            .digest("hex"),
-          fileSize: xzMagicNumber.length + 7,
-        },
-        {
-          arch: "x86_64",
-          os: "linux",
-          version: "0.1.0",
-          extension: "tar.gz",
-          fileShasum: createHash("sha256")
-            .update(gzipMagicNumber)
-            .update("binary2")
-            .digest("hex"),
-          fileSize: gzipMagicNumber.length + 7,
-        },
-      ],
-    });
-
-    const objects = await env.ZIGTOOLS_BUILDS.list({});
-
-    expect(objects.objects).toMatchObject([
-      {
-        key: "index.json",
-      },
-      {
-        key: "zls-linux-x86_64-0.1.0.tar.gz",
-        size: gzipMagicNumber.length + 7,
-      },
-      {
-        key: "zls-linux-x86_64-0.1.0.tar.gz.minisig",
-      },
-      {
-        key: "zls-linux-x86_64-0.1.0.tar.xz",
-        size: xzMagicNumber.length + 7,
-      },
-      {
-        key: "zls-linux-x86_64-0.1.0.tar.xz.minisig",
-      },
-    ]);
   });
 
   test("disallow publishing a failed tagged release", async () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0",
       zigVersion: "0.1.0",
-      artifacts: [],
+      artifacts: {},
     });
 
     expect(await response.text()).toBe(
@@ -976,113 +819,11 @@ describe("/v1/zls/publish", () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0-dev.1+aaaaaaa",
       zigVersion: "0.1.0",
-      artifacts: [],
+      artifacts: {},
     });
 
     expect(await response.text()).toBe(
       "ZLS version '0.1.0-dev.1+aaaaaaa' is new and has not artifacts. A new ZLS build can't be failed!",
-    );
-    expect(response.status).toBe(400);
-  });
-
-  test("FORCE_MINISIGN with missing minisign file", async () => {
-    const form = initPublishForm({
-      zlsVersion: "0.1.0-dev.1+aaaaaaa",
-      zigVersion: "0.1.0",
-      artifacts: [
-        [
-          "zls-windows-aarch64-0.1.0.zip",
-          new Blob([zipMagicNumber, "binary2"]),
-        ],
-      ],
-    });
-
-    const response = await handlePublish(
-      new Request("https://example.com/v1/zls/publish", {
-        body: form,
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
-        },
-      }),
-      {
-        ...env,
-        FORCE_MINISIGN: true,
-      },
-      createExecutionContext(),
-    );
-
-    expect(await response.text()).toBe(
-      "Every artifact must have a minisign file!",
-    );
-    expect(response.status).toBe(400);
-  });
-
-  test("FORCE_MINISIGN with all minisign file", async () => {
-    const form = initPublishForm({
-      zlsVersion: "0.1.0",
-      zigVersion: "0.1.0",
-      artifacts: [
-        ["zls-windows-x86_64-0.1.0.zip", new Blob([zipMagicNumber, "binary2"])],
-        ["zls-windows-x86_64-0.1.0.zip.minisig", new Blob(["something"])],
-      ],
-    });
-
-    const response = await handlePublish(
-      new Request("https://example.com/v1/zls/publish", {
-        body: form,
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
-        },
-      }),
-      {
-        ...env,
-        FORCE_MINISIGN: true,
-      },
-      createExecutionContext(),
-    );
-
-    expect(await response.text()).toBe("");
-    expect(response.status).toBe(200);
-  });
-
-  test("disallow publishing partial minisigns", async () => {
-    const response = await sendPublish({
-      zlsVersion: "0.1.0",
-      zigVersion: "0.1.0",
-      artifacts: [
-        ["zls-linux-x86_64-0.1.0.tar.xz", new Blob([xzMagicNumber, "binary1"])],
-        ["zls-linux-x86_64-0.1.0.tar.xz.minisig", new Blob(["something"])],
-        [
-          "zls-linux-x86_64-0.1.0.tar.gz",
-          new Blob([gzipMagicNumber, "binary1"]),
-        ],
-        ["zls-linux-x86_64-0.1.0.tar.gz.minisig", new Blob(["something"])],
-        [
-          "zls-windows-aarch64-0.1.0.zip",
-          new Blob([zipMagicNumber, "binary2"]),
-        ],
-      ],
-    });
-
-    expect(await response.text()).toBe(
-      "Either, every artifact has a minisign file, or none!",
-    );
-    expect(response.status).toBe(400);
-  });
-
-  test("publish unknown minisign", async () => {
-    const response = await sendPublish({
-      zlsVersion: "0.1.0",
-      zigVersion: "0.1.0",
-      artifacts: [
-        ["zls-linux-x86_64-0.1.0.tar.xz.minisig", new Blob(["something"])],
-      ],
-    });
-
-    expect(await response.text()).toBe(
-      "minisign file 'zls-linux-x86_64-0.1.0.tar.xz.minisig' has not matching artifact!",
     );
     expect(response.status).toBe(400);
   });
@@ -1133,20 +874,20 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.1",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-          [
-            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.gz",
-            new Blob([gzipMagicNumber, "binary2"]),
-          ],
-          [
-            "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip",
-            new Blob([zipMagicNumber, "binary3"]),
-          ],
-        ],
+        artifacts: {
+          "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz": {
+            shasum: "a".repeat(64),
+            size: 1,
+          },
+          "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.gz": {
+            shasum: "b".repeat(64),
+            size: 2,
+          },
+          "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip": {
+            shasum: "c".repeat(64),
+            size: 3,
+          },
+        },
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -1157,7 +898,7 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.2",
-        artifacts: [],
+        artifacts: {},
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -1168,20 +909,20 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.2",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz",
-            new Blob([xzMagicNumber, "binary4"]),
-          ],
-          [
-            "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.gz",
-            new Blob([gzipMagicNumber, "binary5"]),
-          ],
-          [
-            "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip",
-            new Blob([zipMagicNumber, "binary6"]),
-          ],
-        ],
+        artifacts: {
+          "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.xz": {
+            shasum: "d".repeat(64),
+            size: 4,
+          },
+          "zls-linux-x86_64-0.1.0-dev.1+aaaaaaa.tar.gz": {
+            shasum: "e".repeat(64),
+            size: 5,
+          },
+          "zls-windows-aarch64-0.1.0-dev.1+aaaaaaa.zip": {
+            shasum: "f".repeat(64),
+            size: 6,
+          },
+        },
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -1192,7 +933,7 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.1.0-dev.1+aaaaaaa",
         zigVersion: "0.1.3",
-        artifacts: [],
+        artifacts: {},
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -1205,7 +946,6 @@ describe("/v1/zls/publish", () => {
       zigVersion: "0.1.1",
       minimumBuildZigVersion: "0.1.1",
       minimumRuntimeZigVersion: "0.1.1",
-      minisign: false,
       testedZigVersions: {
         "0.1.1": VersionCompatibility.Full,
         "0.1.2": VersionCompatibility.Full,
@@ -1217,33 +957,24 @@ describe("/v1/zls/publish", () => {
           os: "linux",
           version: "0.1.0-dev.1+aaaaaaa",
           extension: "tar.xz",
-          fileShasum: createHash("sha256")
-            .update(xzMagicNumber)
-            .update("binary1")
-            .digest("hex"),
-          fileSize: xzMagicNumber.byteLength + 7,
+          fileShasum: "a".repeat(64),
+          fileSize: 1,
         },
         {
           arch: "x86_64",
           os: "linux",
           version: "0.1.0-dev.1+aaaaaaa",
           extension: "tar.gz",
-          fileShasum: createHash("sha256")
-            .update(gzipMagicNumber)
-            .update("binary2")
-            .digest("hex"),
-          fileSize: gzipMagicNumber.byteLength + 7,
+          fileShasum: "b".repeat(64),
+          fileSize: 2,
         },
         {
           arch: "aarch64",
           os: "windows",
           version: "0.1.0-dev.1+aaaaaaa",
           extension: "zip",
-          fileShasum: createHash("sha256")
-            .update(zipMagicNumber)
-            .update("binary3")
-            .digest("hex"),
-          fileSize: zipMagicNumber.byteLength + 7,
+          fileShasum: "c".repeat(64),
+          fileSize: 3,
         },
       ],
     });
@@ -1257,16 +988,10 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.11.0",
         zigVersion: "0.11.0",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.11.0.tar.xz",
-            new Blob([xzMagicNumber, "binary1"]),
-          ],
-          [
-            "zls-linux-x86_64-0.11.0.tar.gz",
-            new Blob([gzipMagicNumber, "binary2"]),
-          ],
-        ],
+        artifacts: {
+          "zls-linux-x86_64-0.11.0.tar.xz": { shasum: "a".repeat(64), size: 1 },
+          "zls-linux-x86_64-0.11.0.tar.gz": { shasum: "b".repeat(64), size: 2 },
+        },
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -1276,20 +1001,11 @@ describe("/v1/zls/publish", () => {
       const response = await sendPublish({
         zlsVersion: "0.11.0",
         zigVersion: "0.11.1",
-        artifacts: [
-          [
-            "zls-linux-x86_64-0.11.0.tar.xz",
-            new Blob([xzMagicNumber, "binary3"]),
-          ],
-          [
-            "zls-linux-x86_64-0.11.0.tar.gz",
-            new Blob([gzipMagicNumber, "binary4"]),
-          ],
-          [
-            "zls-windows-aarch64-0.11.0.zip",
-            new Blob([zipMagicNumber, "binary5"]),
-          ],
-        ],
+        artifacts: {
+          "zls-linux-x86_64-0.11.0.tar.xz": { shasum: "c".repeat(64), size: 3 },
+          "zls-linux-x86_64-0.11.0.tar.gz": { shasum: "d".repeat(64), size: 4 },
+          "zls-windows-aarch64-0.11.0.zip": { shasum: "e".repeat(64), size: 5 },
+        },
       });
       expect(await response.text()).toBe("");
       expect(response.status).toBe(200);
@@ -1302,7 +1018,6 @@ describe("/v1/zls/publish", () => {
       zigVersion: "0.11.0",
       minimumBuildZigVersion: "0.11.0",
       minimumRuntimeZigVersion: "0.11.0",
-      minisign: false,
       testedZigVersions: {
         "0.11.0": VersionCompatibility.Full,
         "0.11.1": VersionCompatibility.Full,
@@ -1313,61 +1028,19 @@ describe("/v1/zls/publish", () => {
           os: "linux",
           version: "0.11.0",
           extension: "tar.xz",
-          fileShasum: createHash("sha256")
-            .update(xzMagicNumber)
-            .update("binary1")
-            .digest("hex"),
-          fileSize: xzMagicNumber.byteLength + 7,
+          fileShasum: "a".repeat(64),
+          fileSize: 1,
         },
         {
           arch: "x86_64",
           os: "linux",
           version: "0.11.0",
           extension: "tar.gz",
-          fileShasum: createHash("sha256")
-            .update(gzipMagicNumber)
-            .update("binary2")
-            .digest("hex"),
-          fileSize: gzipMagicNumber.byteLength + 7,
+          fileShasum: "b".repeat(64),
+          fileSize: 2,
         },
       ],
     });
-
-    const objects = await env.ZIGTOOLS_BUILDS.list({});
-
-    expect(objects.objects).toMatchObject([
-      {
-        key: "index.json",
-      },
-      {
-        key: "zls-linux-x86_64-0.11.0.tar.gz",
-        size: gzipMagicNumber.length + 7,
-      },
-      {
-        key: "zls-linux-x86_64-0.11.0.tar.xz",
-        size: xzMagicNumber.length + 7,
-      },
-    ]);
-
-    assert(objects.objects[1].checksums.sha256 !== undefined);
-    assert(objects.objects[2].checksums.sha256 !== undefined);
-
-    expect(
-      Buffer.from(objects.objects[1].checksums.sha256).toString("hex"),
-    ).toBe(
-      createHash("sha256")
-        .update(gzipMagicNumber)
-        .update("binary2")
-        .digest("hex"),
-    );
-    expect(
-      Buffer.from(objects.objects[2].checksums.sha256).toString("hex"),
-    ).toBe(
-      createHash("sha256")
-        .update(xzMagicNumber)
-        .update("binary1")
-        .digest("hex"),
-    );
 
     const response = await env.ZIGTOOLS_BUILDS.get("index.json");
     assert(response !== null);
@@ -1378,12 +1051,9 @@ describe("/v1/zls/publish", () => {
       "0.11.0": {
         date: "2024-10-17",
         "x86_64-linux": {
-          shasum: createHash("sha256")
-            .update(xzMagicNumber)
-            .update("binary1")
-            .digest("hex"),
-          size: (xzMagicNumber.length + 7).toString(),
           tarball: `${env.R2_PUBLIC_URL}/zls-linux-x86_64-0.11.0.tar.xz`,
+          shasum: "a".repeat(64),
+          size: "1",
         },
       },
     });

@@ -27,6 +27,25 @@
   ],
   "vars": {
     "R2_PUBLIC_URL": "https://builds.zigtools.org",
-    "FORCE_MINISIGN": false,
+  },
+  "env": {
+    "production": {
+      "d1_databases": [
+        {
+          "binding": "ZIGTOOLS_DB",
+          "database_name": "production-db-backend",
+          "database_id": "86dcfef4-8abd-4ff6-97a8-04c231ea2e6c",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ZIGTOOLS_BUILDS",
+          "bucket_name": "zigtools-builds",
+        },
+      ],
+      "vars": {
+        "R2_PUBLIC_URL": "https://builds.zigtools.org",
+      },
+    },
   },
 }
