@@ -471,7 +471,7 @@ The body is a JSON object with the following fields:
 
 The key of `artifacts` is the file name of a release artifact with the following format:
 
-`zls-${OS}-${ARCH}-${ZLS_VERSION}.(tar.xz|tar.gz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
+`zls-${TARGET}-${ZLS_VERSION}.(tar.xz|tar.gz|zip)` (Example: `zls-linux-x86_64-0.1.0.tar.xz`)
 
 Artifacts that target windows must be `.zip` files. All other non windows targets must include `.tar.xz` **and** `.tar.gz`.
 
@@ -491,5 +491,5 @@ npm run dev
 git clone https://github.com/zigtools/zls
 cd zls
 zig build release
-ZLS_WORKER_ENDPOINT=http://localhost:8787 zig run .github/workflows/publish_release.zig
+zig run .github/workflows/prepare_release_payload.zig | curl --request POST --user admin:amogus --header "Content-Type: application/json" --data @- http://localhost:8787/v1/zls/publish
 ```

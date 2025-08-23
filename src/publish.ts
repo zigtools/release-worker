@@ -1,13 +1,13 @@
 import assert from "node:assert";
 import { Buffer } from "node:buffer";
 import {
-  ArtifactEntry,
   D2JsonData,
   Extension,
   ReleaseArtifact,
   VersionCompatibility,
   ZLSIndex,
   artifactsToRecord,
+  targetFormat,
 } from "./shared";
 import { SemanticVersion } from "./semantic-version";
 
@@ -283,21 +283,38 @@ export async function handlePublish(
         status: 400, // Bad Request
       });
     }
+    assert.strictEqual(
+      key,
+      `zls-${match[1]}-${match[2]}-${match[3]}.${match[4]}`,
+    );
 
-    const os = match[1];
-    const arch = match[2];
-    const version = match[3];
+    const rawVersion = match[3];
     const extension = match[4] as Extension;
 
-    assert.strictEqual(key, `zls-${os}-${arch}-${version}.${extension}`);
-
-    if (SemanticVersion.parse(version) === null) {
+    const version = SemanticVersion.parse(rawVersion);
+    if (version === null) {
       return new Response(
-        `artifact '${key}' has an invalid version '${version}'!`,
+        `artifact '${key}' has an invalid version '${rawVersion}'!`,
         {
           status: 400, // Bad Request
         },
       );
+    }
+
+    const osArchOrderSwapVersion = SemanticVersion.parse("0.15.0");
+    assert(osArchOrderSwapVersion != null);
+
+    let os;
+    let arch;
+    switch (targetFormat(version)) {
+      case "arch-os":
+        arch = match[1];
+        os = match[2];
+        break;
+      case "os-arch":
+        os = match[1];
+        arch = match[2];
+        break;
     }
 
     if (size == 0) {
@@ -322,7 +339,7 @@ export async function handlePublish(
     releaseArtifacts.push({
       os: os,
       arch: arch,
-      version: version,
+      version: rawVersion,
       extension: extension,
       fileShasum: shasum,
       fileSize: size,

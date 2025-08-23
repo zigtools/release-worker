@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import assert from "node:assert";
-import { describe, test, expect, beforeEach, beforeAll } from "vitest";
+import { describe, test, expect, beforeAll } from "vitest";
 import {
   D2JsonData,
   ReleaseArtifact,
@@ -15,36 +15,6 @@ import {
 } from "../src/select-zls-version";
 import { SemanticVersion } from "../src/semantic-version";
 
-const defaultArtifacts: ReleaseArtifact[] = [
-  {
-    arch: "x86_64",
-    os: "linux",
-    version: "0.11.0",
-    extension: "tar.xz",
-    fileShasum:
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    fileSize: 12,
-  },
-  {
-    arch: "x86_64",
-    os: "linux",
-    version: "0.11.0",
-    extension: "tar.gz",
-    fileShasum:
-      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    fileSize: 12,
-  },
-  {
-    arch: "aarch64",
-    os: "windows",
-    version: "0.11.0",
-    extension: "zip",
-    fileShasum:
-      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-    fileSize: 12,
-  },
-];
-
 const samples: D2JsonData[] = [
   {
     date: 0,
@@ -52,7 +22,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.9.0-dev.20+aaaaaaaaa",
     minimumBuildZigVersion: "0.9.0-dev.25+aaaaaaaaa",
     minimumRuntimeZigVersion: "0.9.0-dev.15+aaaaaaaaa",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.9.0-dev.3+aaaaaaaaa"),
     testedZigVersions: {
       "0.9.0-dev.20+aaaaaaaaa": VersionCompatibility.Full,
       "0.9.0-dev.25+aaaaaaaaa": VersionCompatibility.Full,
@@ -65,7 +35,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.11.0",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.11.0",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.11.0"),
     testedZigVersions: { "0.11.0": VersionCompatibility.Full },
   },
   {
@@ -74,7 +44,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.11.0",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.11.0",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.12.0-dev.1+aaaaaaaaa"),
     testedZigVersions: {
       "0.11.0": VersionCompatibility.Full,
       "0.12.0-dev.2+aaaaaaaaa": VersionCompatibility.Full,
@@ -89,7 +59,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0-dev.7+aaaaaaaaa",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.12.0-dev.7+aaaaaaaaa",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.12.0-dev.2+aaaaaaaaa"),
     testedZigVersions: {
       "0.12.0-dev.7+aaaaaaaaa": VersionCompatibility.Full,
       "0.12.0-dev.8+aaaaaaaaa": VersionCompatibility.Full,
@@ -103,7 +73,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0-dev.17+aaaaaaaaa",
     minimumBuildZigVersion: "0.11.0",
     minimumRuntimeZigVersion: "0.12.0-dev.14+aaaaaaaaa",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.12.0-dev.3+aaaaaaaaa"),
     testedZigVersions: {
       "0.12.0-dev.17+aaaaaaaaa": VersionCompatibility.Full,
     },
@@ -114,7 +84,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0",
     minimumBuildZigVersion: "0.12.0",
     minimumRuntimeZigVersion: "0.12.0",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.12.0"),
     testedZigVersions: {
       "0.12.0": VersionCompatibility.Full,
       "0.12.1": VersionCompatibility.Full,
@@ -127,7 +97,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.12.0",
     minimumBuildZigVersion: "0.12.0",
     minimumRuntimeZigVersion: "0.12.0",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.12.1"),
     testedZigVersions: { "0.12.0": VersionCompatibility.Full },
   },
   {
@@ -136,7 +106,7 @@ const samples: D2JsonData[] = [
     zigVersion: "0.13.0",
     minimumBuildZigVersion: "0.13.0",
     minimumRuntimeZigVersion: "0.13.0",
-    artifacts: defaultArtifacts,
+    artifacts: createExampleArtifacts("0.13.0"),
     testedZigVersions: {
       "0.13.0": VersionCompatibility.Full,
       "0.14.0-dev.2+aaaaaaaaa": VersionCompatibility.Full,
@@ -145,9 +115,41 @@ const samples: D2JsonData[] = [
   },
 ];
 
-async function populateDatabase(): Promise<void> {
-  shuffleArray(samples);
-  const statements = samples.map((sample) => {
+function createExampleArtifacts(version: string): ReleaseArtifact[] {
+  return [
+    {
+      arch: "x86_64",
+      os: "linux",
+      version: version,
+      extension: "tar.xz",
+      fileShasum:
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      fileSize: 12,
+    },
+    {
+      arch: "x86_64",
+      os: "linux",
+      version: version,
+      extension: "tar.gz",
+      fileShasum:
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      fileSize: 12,
+    },
+    {
+      arch: "aarch64",
+      os: "windows",
+      version: version,
+      extension: "zip",
+      fileShasum:
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      fileSize: 12,
+    },
+  ];
+}
+
+async function populateDatabase(entries: D2JsonData[]): Promise<void> {
+  shuffleArray(entries);
+  const statements = entries.map((sample) => {
     const zlsVersion = SemanticVersion.parse(sample.zlsVersion);
     assert(zlsVersion !== null);
 
@@ -294,7 +296,9 @@ describe("/v1/zls/select-version", () => {
   });
 
   describe("test on sample database", () => {
-    beforeAll(populateDatabase);
+    beforeAll(async () => {
+      await populateDatabase(samples);
+    });
 
     test("search for with Version 0.11.0", async () => {
       const response = await selectZLSVersion(
@@ -443,6 +447,41 @@ describe("/v1/zls/select-version", () => {
           message: expectedError,
         });
       },
+    );
+  });
+
+  test("target string has changed with begining with 0.15.0", async () => {
+    await populateDatabase([
+      {
+        date: 0,
+        zlsVersion: "0.15.0",
+        zigVersion: "0.15.0",
+        minimumBuildZigVersion: "0.15.0",
+        minimumRuntimeZigVersion: "0.15.0",
+        artifacts: createExampleArtifacts("0.15.0"),
+        testedZigVersions: {
+          "0.15.0": VersionCompatibility.Full,
+        },
+      },
+    ]);
+
+    const response = await selectZLSVersion(
+      "0.15.0",
+      VersionCompatibility.Full,
+    );
+
+    expect(response).not.toHaveProperty("message");
+    assert(!("message" in response));
+
+    expect(response).toHaveProperty("x86_64-linux");
+    expect(response).not.toHaveProperty("linux-x86_64");
+
+    const artifactEntry = response["x86_64-linux"];
+    expect(artifactEntry).toHaveProperty("tarball");
+    assert(typeof artifactEntry == "object");
+
+    expect(artifactEntry.tarball).toBe(
+      `${env.R2_PUBLIC_URL}/zls-x86_64-linux-0.15.0.tar.xz`,
     );
   });
 

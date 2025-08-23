@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { Order, SemanticVersion } from "./semantic-version";
 
 export interface D2JsonData {
   date: number;
@@ -63,6 +64,18 @@ export interface SQLiteQueryPlanRow {
   detail: string;
 }
 
+export function targetFormat(version: SemanticVersion): "arch-os" | "os-arch" {
+  const osArchOrderSwapVersion = SemanticVersion.parse("0.15.0");
+  assert(osArchOrderSwapVersion != null);
+  switch (SemanticVersion.order(version, osArchOrderSwapVersion)) {
+    case Order.lt:
+      return "os-arch";
+    case Order.eq:
+    case Order.gt:
+      return "arch-os";
+  }
+}
+
 export function artifactsToRecord(
   R2_PUBLIC_URL: string,
   artifacts: ReleaseArtifact[],
@@ -77,10 +90,24 @@ export function artifactsToRecord(
       case "zip":
         break;
     }
+
+    const version = SemanticVersion.parse(artifact.version);
+    assert(version != null);
+
+    let targetString;
+    switch (targetFormat(version)) {
+      case "arch-os":
+        targetString = `${artifact.arch}-${artifact.os}`;
+        break;
+      case "os-arch":
+        targetString = `${artifact.os}-${artifact.arch}`;
+        break;
+    }
+
     assert(!(`${artifact.arch}-${artifact.os}` in targets));
     assert.strictEqual(artifact.fileShasum.length, 64);
     targets[`${artifact.arch}-${artifact.os}`] = {
-      tarball: `${R2_PUBLIC_URL}/zls-${artifact.os}-${artifact.arch}-${artifact.version}.${artifact.extension}`,
+      tarball: `${R2_PUBLIC_URL}/zls-${targetString}-${artifact.version}.${artifact.extension}`,
       shasum: artifact.fileShasum,
       size: artifact.fileSize.toString(),
     };

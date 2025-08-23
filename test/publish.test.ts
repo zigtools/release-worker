@@ -802,6 +802,29 @@ describe("/v1/zls/publish", () => {
     });
   });
 
+  test("publish build new target format (0.15.0 or later)", async () => {
+    const response = await sendPublish({
+      zlsVersion: "0.15.0",
+      zigVersion: "0.15.0",
+      artifacts: {
+        "zls-x86_64-linux-0.15.0.tar.xz": {
+          shasum: "a".repeat(64),
+          size: 1,
+        },
+        "zls-x86_64-linux-0.15.0.tar.gz": {
+          shasum: "b".repeat(64),
+          size: 2,
+        },
+        "zls-aarch64-windows-0.15.0.zip": {
+          shasum: "c".repeat(64),
+          size: 3,
+        },
+      },
+    });
+    expect(await response.text()).toBe("");
+    expect(response.status).toBe(200);
+  });
+
   test("disallow publishing a failed tagged release", async () => {
     const response = await sendPublish({
       zlsVersion: "0.1.0",
