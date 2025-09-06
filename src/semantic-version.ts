@@ -10,8 +10,6 @@ export class SemanticVersion {
   major!: number;
   minor!: number;
   patch!: number;
-  /** `isRelease` <=> `!commitHeight && !commitID` */
-  isRelease!: boolean;
   /** `isRelease` <=> `!commitHeight` */
   commitHeight?: number;
   /** `isRelease` <=> `!commitID` */
@@ -38,7 +36,6 @@ export class SemanticVersion {
     assert(!isNaN(semver.patch));
 
     assert(!match[4] == !match[5]);
-    semver.isRelease = !match[4];
 
     if (!match[4]) return semver;
 
@@ -70,6 +67,50 @@ export class SemanticVersion {
     if (lhs.commitHeight > rhs.commitHeight) return Order.gt;
 
     return Order.eq;
+  }
+
+  public static satisfies(
+    version: SemanticVersion,
+    minimum: SemanticVersion,
+    strict: boolean,
+  ): boolean {
+    if (!version.isRelease && version.patch != 0) {
+      // A version like `0.12.2-dev` has the same compatibility as `0.12.1`
+      version.patch -= 1;
+      version.commitHeight = undefined;
+      version.commitID = undefined;
+    }
+
+    if (strict && !version.isRelease) {
+      assert(minimum.isRelease);
+      return false;
+    }
+
+    if (version.major != minimum.major) {
+      return false;
+    }
+
+    if (minimum.isRelease) {
+      if (version.isRelease) {
+        if (SemanticVersion.order(version, minimum) == Order.lt) return false;
+        const next_minor_release = new SemanticVersion();
+        next_minor_release.major = minimum.major;
+        next_minor_release.minor = minimum.minor + 1;
+        next_minor_release.patch = 0;
+        return SemanticVersion.order(version, next_minor_release) == Order.lt;
+      } else {
+        assert(version.patch == 0);
+        return version.minor == 1 + minimum.minor;
+      }
+    } else {
+      if (version.isRelease) return false;
+      if (version.minor != minimum.minor) return false;
+      return SemanticVersion.order(version, minimum) != Order.lt;
+    }
+  }
+
+  get isRelease(): boolean {
+    return this.commitHeight == undefined && this.commitID === undefined;
   }
 
   public toString(): string {

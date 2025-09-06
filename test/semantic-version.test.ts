@@ -90,3 +90,66 @@ test.each<[string, "<" | "=" | ">", string]>([
   }
   expect(actualOrder).toBe(expectedOrder);
 });
+
+test.each<[string, string, "no" | "yes" | "if-no-strict"]>([
+  // Minimum Version: 0.12.0
+  ["0.12.0", "0.11.0-dev.1+aaaaaaa", "no"],
+  ["0.12.0", "0.11.0", "no"],
+  ["0.12.0", "0.12.0-dev.1+aaaaaaa", "no"],
+  ["0.12.0", "0.12.0", "yes"],
+  ["0.12.0", "0.12.1-dev.1+aaaaaaa", "yes"],
+  ["0.12.0", "0.12.1", "yes"],
+  ["0.12.0", "0.13.0-dev.1+aaaaaaa", "if-no-strict"],
+  ["0.12.0", "0.13.0", "no"],
+  ["0.12.0", "0.13.1-dev.1+aaaaaaa", "no"],
+  ["0.12.0", "1.0.0", "no"],
+  // Minimum Version: 0.12.1
+  ["0.12.1", "0.11.0", "no"],
+  ["0.12.1", "0.11.1", "no"],
+  ["0.12.1", "0.12.0-dev.1+aaaaaaa", "no"],
+  ["0.12.1", "0.12.0", "no"],
+  ["0.12.1", "0.12.1-dev.1+aaaaaaa", "no"],
+  ["0.12.1", "0.12.1", "yes"],
+  ["0.12.1", "0.12.2-dev.1+aaaaaaa", "yes"],
+  ["0.12.1", "0.12.2", "yes"],
+  ["0.12.1", "0.13.0-dev.1+aaaaaaa", "if-no-strict"],
+  ["0.12.1", "0.13.0", "no"],
+  ["0.12.1", "0.13.1-dev.1+aaaaaaa", "no"],
+  ["0.12.1", "0.13.1", "no"],
+  // Minimum Version: 0.12.0-dev.5+aaaaa
+  ["0.12.0-dev.5+aaaaaaa", "0.11.0-dev.1+aaaaaaa", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.11.0", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.12.0-dev.1+aaaaaaa", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.12.0-dev.4+aaaaaaa", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.12.0-dev.5+aaaaaaa", "yes"],
+  ["0.12.0-dev.5+aaaaaaa", "0.12.0-dev.10+aaaaaaa", "yes"],
+  ["0.12.0-dev.5+aaaaaaa", "0.12.0", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.12.1", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.13.0-dev.10+aaaaaaa", "no"],
+  ["0.12.0-dev.5+aaaaaaa", "0.13.0", "no"],
+])("%s satisfies min=%s -> %s", (minimumString, versionString, expected) => {
+  const minimum = SemanticVersion.parse(minimumString);
+  assert(minimum !== null);
+  const version = SemanticVersion.parse(versionString);
+  assert(version !== null);
+  switch (expected) {
+    case "no":
+      expect(SemanticVersion.satisfies(version, minimum, false)).toBe(false);
+      if (minimum.isRelease) {
+        expect(SemanticVersion.satisfies(version, minimum, true)).toBe(false);
+      }
+      break;
+    case "yes":
+      expect(SemanticVersion.satisfies(version, minimum, false)).toBe(true);
+      if (minimum.isRelease) {
+        expect(SemanticVersion.satisfies(version, minimum, true)).toBe(true);
+      }
+      break;
+    case "if-no-strict":
+      expect(SemanticVersion.satisfies(version, minimum, false)).toBe(true);
+      if (minimum.isRelease) {
+        expect(SemanticVersion.satisfies(version, minimum, true)).toBe(false);
+      }
+      break;
+  }
+});

@@ -450,6 +450,72 @@ describe("/v1/zls/select-version", () => {
     );
   });
 
+  test("select development build before tagged release is available", async () => {
+    await populateDatabase([
+      {
+        date: 0,
+        zlsVersion: "0.15.0",
+        zigVersion: "0.15.1",
+        minimumBuildZigVersion: "0.15.1",
+        minimumRuntimeZigVersion: "0.15.1",
+        artifacts: createExampleArtifacts("0.15.0"),
+        testedZigVersions: {
+          "0.15.1": VersionCompatibility.Full,
+        },
+      },
+    ]);
+
+    {
+      const response = await selectZLSVersion(
+        "0.15.1-dev.1+aaaaaaaaa",
+        VersionCompatibility.Full,
+      );
+      expect(response.code).toBe(
+        SelectVersionFailureCode.DevelopmentBuildUnsupported,
+      );
+    }
+
+    {
+      const response = await selectZLSVersion(
+        "0.15.2-dev.1+aaaaaaaaa",
+        VersionCompatibility.Full,
+      );
+      expect(response).toMatchObject({
+        version: "0.15.0",
+      });
+    }
+
+    {
+      const response = await selectZLSVersion(
+        "0.16.0-dev.1+aaaaaaaaa",
+        VersionCompatibility.Full,
+      );
+      expect(response).not.toHaveProperty("code");
+      assert(!("code" in response));
+      expect(response.version).toBe("0.15.0");
+    }
+
+    {
+      const response = await selectZLSVersion(
+        "0.16.1-dev.1+aaaaaaaaa",
+        VersionCompatibility.Full,
+      );
+      expect(response.code).toBe(
+        SelectVersionFailureCode.DevelopmentBuildUnsupported,
+      );
+    }
+
+    {
+      const response = await selectZLSVersion(
+        "0.17.0-dev.1+aaaaaaaaa",
+        VersionCompatibility.Full,
+      );
+      expect(response.code).toBe(
+        SelectVersionFailureCode.DevelopmentBuildUnsupported,
+      );
+    }
+  });
+
   test("target string has changed with begining with 0.15.0", async () => {
     await populateDatabase([
       {

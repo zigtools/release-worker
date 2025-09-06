@@ -312,7 +312,20 @@ async function selectOnDevelopmentBuild(
       // update the "explain query plan when searching all tagged releases" test when modifying the query
       "SELECT JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",
     ).first<{ JsonData: string }>();
-    releases = latestTaggedRelease != null ? [latestTaggedRelease] : [];
+
+    if (latestTaggedRelease != null) {
+      const latestRelease = JSON.parse(
+        latestTaggedRelease.JsonData,
+      ) as D2JsonData;
+      const minRuntimeZigVersion = SemanticVersion.parse(
+        latestRelease.minimumRuntimeZigVersion,
+      );
+      assert(minRuntimeZigVersion !== null);
+
+      if (SemanticVersion.satisfies(zigVersion, minRuntimeZigVersion, false)) {
+        releases = [latestTaggedRelease];
+      }
+    }
   }
 
   if (releases.length == 0) {
@@ -326,11 +339,7 @@ async function selectOnDevelopmentBuild(
   );
 
   if (SemanticVersion.order(zigVersion, oldestMinZigVersion) == Order.lt) {
-    if (developmentReleases.results.length == 0) {
-      return SelectVersionFailureCode.DevelopmentBuildUnsupported;
-    } else {
-      return SelectVersionFailureCode.Unsupported;
-    }
+    return SelectVersionFailureCode.Unsupported;
   }
 
   // The following algorithm assumes that the Zig version and tested Zig
