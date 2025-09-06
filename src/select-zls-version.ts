@@ -188,7 +188,17 @@ async function selectOnTaggedRelease(
     .first<{ JsonData: string }>();
 
   if (selectedRelease !== null) {
-    return JSON.parse(selectedRelease.JsonData) as D2JsonData;
+    const jsonData = JSON.parse(selectedRelease.JsonData) as D2JsonData;
+    const minRuntimeZigVersion = SemanticVersion.parse(
+      jsonData.minimumRuntimeZigVersion,
+    );
+    assert(minRuntimeZigVersion !== null);
+
+    if (SemanticVersion.satisfies(zigVersion, minRuntimeZigVersion, true)) {
+      return jsonData;
+    } else {
+      return SelectVersionFailureCode.TaggedReleaseIncompatible;
+    }
   }
 
   // If the version is older than the oldest available tagged release then the version is declared unsupported.

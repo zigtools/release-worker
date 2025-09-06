@@ -467,6 +467,16 @@ describe("/v1/zls/select-version", () => {
 
     {
       const response = await selectZLSVersion(
+        "0.15.0",
+        VersionCompatibility.Full,
+      );
+      expect(response.code).toBe(
+        SelectVersionFailureCode.TaggedReleaseIncompatible,
+      );
+    }
+
+    {
+      const response = await selectZLSVersion(
         "0.15.1-dev.1+aaaaaaaaa",
         VersionCompatibility.Full,
       );
