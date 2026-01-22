@@ -561,6 +561,32 @@ describe("/v1/zls/select-version", () => {
     );
   });
 
+  test("tagged release with a minimum zig version lower than itself", async () => {
+    await populateDatabase([
+      {
+        date: 0,
+        zlsVersion: "0.13.0",
+        zigVersion: "0.13.0",
+        minimumBuildZigVersion: "0.12.0",
+        minimumRuntimeZigVersion: "0.12.0",
+        artifacts: createExampleArtifacts("0.13.0"),
+        testedZigVersions: {
+          "0.13.0": VersionCompatibility.Full,
+        },
+      },
+    ]);
+
+    const response = await selectZLSVersion(
+      "0.13.0",
+      VersionCompatibility.Full,
+    );
+
+    expect(response).not.toHaveProperty("message");
+    assert(!("message" in response));
+
+    expect(response.version).toBe("0.13.0");
+  });
+
   test("explain query plan when searching all tagged releases", async () => {
     const response = await env.ZIGTOOLS_DB.prepare(
       "EXPLAIN QUERY PLAN SELECT ZLSVersion, JsonData FROM ZLSReleases WHERE IsRelease = 1 ORDER BY ZLSVersionMajor DESC, ZLSVersionMinor DESC, ZLSVersionPatch DESC",

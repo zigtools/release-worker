@@ -194,7 +194,7 @@ async function selectOnTaggedRelease(
     );
     assert(minRuntimeZigVersion !== null);
 
-    if (SemanticVersion.satisfies(zigVersion, minRuntimeZigVersion, true)) {
+    if (SemanticVersion.order(zigVersion, minRuntimeZigVersion) != Order.lt) {
       return jsonData;
     } else {
       return SelectVersionFailureCode.TaggedReleaseIncompatible;
