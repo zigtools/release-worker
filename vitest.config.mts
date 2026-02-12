@@ -21,7 +21,6 @@ export default defineWorkersConfig({
         miniflare: {
           bindings: { TEST_MIGRATIONS: migrations },
         },
-        singleWorker: true, // https://github.com/cloudflare/workers-sdk/issues/5942
       },
     },
   },
