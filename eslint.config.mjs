@@ -28,6 +28,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["**/*.js", "**/*.mjs", "vitest.config.mts"],
+    ignores: ["**/*.js", "**/*.mjs", "vitest.config.mts", "worker-configuration.d.ts"],
   },
 );

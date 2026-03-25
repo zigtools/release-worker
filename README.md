@@ -482,6 +482,7 @@ Artifacts that target windows must be `.zip` files. All other non windows target
 git clone https://github.com/zigtools/release-worker
 cd release-worker
 npm install
+npm run cf-typegen
 npx wrangler d1 execute staging-db-backend --local --file=./migrations/0000_initial.sql
 npm run dev
 ```
