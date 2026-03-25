@@ -1,8 +1,11 @@
-import { SELF } from "cloudflare:test";
+import { exports } from "cloudflare:workers";
 import { test, expect } from "vitest";
 
 test("unknown URL path", async () => {
-  const response = await SELF.fetch("https://example.com/unknown", {});
+  const response = await exports.default.fetch(
+    "https://example.com/unknown",
+    {},
+  );
   expect(response.status).toBe(404);
   expect(Object.fromEntries(response.headers.entries())).toStrictEqual({
     "access-control-allow-origin": "*",
@@ -11,7 +14,7 @@ test("unknown URL path", async () => {
 });
 
 test("standard OPTIONS request", async () => {
-  const response = await SELF.fetch("https://example.com", {
+  const response = await exports.default.fetch("https://example.com", {
     method: "OPTIONS",
   });
   expect(response.status).toBe(200);
@@ -21,7 +24,7 @@ test("standard OPTIONS request", async () => {
 });
 
 test("CORS OPTIONS request", async () => {
-  const response = await SELF.fetch("https://example.com", {
+  const response = await exports.default.fetch("https://example.com", {
     method: "OPTIONS",
     headers: {
       Origin: "https://foo.example",
