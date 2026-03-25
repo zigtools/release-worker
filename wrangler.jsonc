@@ -30,6 +30,7 @@
   },
   "env": {
     "production": {
+      "name": "release-worker-production",
       "d1_databases": [
         {
           "binding": "ZIGTOOLS_DB",
