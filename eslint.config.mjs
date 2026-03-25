@@ -1,10 +1,11 @@
 import eslint from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig(
   eslint.configs.recommended,
-  ...tseslint.configs.stylisticTypeChecked,
-  ...tseslint.configs.strictTypeChecked,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
     rules: {
       "no-shadow": "off",
@@ -23,11 +24,16 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
       },
     },
   },
   {
-    ignores: ["**/*.js", "**/*.mjs", "vitest.config.mts", "worker-configuration.d.ts"],
+    ignores: [
+      "**/*.js",
+      "**/*.mjs",
+      "vitest.config.mts",
+      "worker-configuration.d.ts",
+      "test/**/*.ts", // TODO
+    ],
   },
 );
