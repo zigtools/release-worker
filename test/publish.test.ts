@@ -1,4 +1,8 @@
-import { createExecutionContext, env, SELF } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
+import {
+  createExecutionContext,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import assert from "node:assert";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -27,7 +31,7 @@ async function searchZLSRelease(
 
 async function sendPublishForm(body: PublishRequest): Promise<Response> {
   assert(typeof env.API_TOKEN === "string" && env.API_TOKEN);
-  return await SELF.fetch(
+  return await exports.default.fetch(
     new Request("https://example.com/v1/zls/publish", {
       body: JSON.stringify(body),
       method: "POST",
@@ -121,8 +125,14 @@ function getSampleArtifacts(version: string): Record<string, ArtifactMetadata> {
 }
 
 describe("/v1/zls/publish", () => {
+  afterEach(async () => {
+    await env.ZIGTOOLS_DB.exec("DELETE FROM ZLSReleases");
+  });
+
   test("expect POST method", async () => {
-    const response = await SELF.fetch("https://example.com/v1/zls/publish");
+    const response = await exports.default.fetch(
+      "https://example.com/v1/zls/publish",
+    );
     expect(await response.text()).toBe("method must be 'POST'");
     expect(response.status).toBe(405);
   });
@@ -146,22 +156,28 @@ describe("/v1/zls/publish", () => {
 
   describe("check authorization", () => {
     test("missing Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        method: "POST",
-      });
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          method: "POST",
+        },
+      );
 
       expect(await response.text()).toBe("Authorization failed");
       expect(response.status).toBe(401);
     });
 
     test("invalid Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: null,
-        method: "POST",
-        headers: {
-          Authorization: "invalid",
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: null,
+          method: "POST",
+          headers: {
+            Authorization: "invalid",
+          },
         },
-      });
+      );
       expect(await response.text()).toContain(
         "Unexpected Authorization header",
       );
@@ -169,13 +185,16 @@ describe("/v1/zls/publish", () => {
     });
 
     test("non Basic Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: null,
-        method: "POST",
-        headers: {
-          Authorization: "Bearer foo",
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: null,
+          method: "POST",
+          headers: {
+            Authorization: "Bearer foo",
+          },
         },
-      });
+      );
       expect(await response.text()).toBe(
         "Expected 'Basic' authentication scheme!",
       );
@@ -183,13 +202,16 @@ describe("/v1/zls/publish", () => {
     });
 
     test("invalid Basic Authorization header", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: null,
-        method: "POST",
-        headers: {
-          Authorization: "Basic :",
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: null,
+          method: "POST",
+          headers: {
+            Authorization: "Basic :",
+          },
         },
-      });
+      );
       expect(await response.text()).toContain(
         "Unexpected Authorization header",
       );
@@ -197,25 +219,31 @@ describe("/v1/zls/publish", () => {
     });
 
     test("wrong username", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: null,
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`wrong:${env.API_TOKEN}`).toString("base64")}`,
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: null,
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${Buffer.from(`wrong:${env.API_TOKEN}`).toString("base64")}`,
+          },
         },
-      });
+      );
       expect(await response.text()).toBe("Authorization failed");
       expect(response.status).toBe(401);
     });
 
     test("wrong password", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: null,
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from("admin:wrong").toString("base64")}`,
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: null,
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${Buffer.from("admin:wrong").toString("base64")}`,
+          },
         },
-      });
+      );
       expect(await response.text()).toBe("Authorization failed");
       expect(response.status).toBe(401);
     });
@@ -223,26 +251,32 @@ describe("/v1/zls/publish", () => {
 
   describe("validate request body", () => {
     test("body is not a json", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: null,
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: null,
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
+          },
         },
-      });
+      );
       expect(await response.text()).toBe(`Unexpected end of JSON input`);
       expect(response.status).toBe(400);
     });
 
     test("body is not a JSON object", async () => {
-      const response = await SELF.fetch("https://example.com/v1/zls/publish", {
-        body: JSON.stringify(5),
-        method: "POST",
-        headers: {
-          "content-type": "application/json;charset=UTF-8",
-          Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
+      const response = await exports.default.fetch(
+        "https://example.com/v1/zls/publish",
+        {
+          body: JSON.stringify(5),
+          method: "POST",
+          headers: {
+            "content-type": "application/json;charset=UTF-8",
+            Authorization: `Basic ${Buffer.from(`admin:${env.API_TOKEN}`).toString("base64")}`,
+          },
         },
-      });
+      );
       expect(await response.text()).toBe(`request body is not a JSON object!`);
       expect(response.status).toBe(400);
     });

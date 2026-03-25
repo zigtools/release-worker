@@ -1,6 +1,5 @@
 declare module "cloudflare:test" {
   interface ProvidedEnv extends Env {
-    ZIGTOOLS_DB: D1Database;
-    TEST_MIGRATIONS: D1Migration[]; // Defined in `vitest.config.ts`
+    TEST_MIGRATIONS: import("cloudflare:test").D1Migration[]; // Defined in `vitest.config.mts`
   }
 }

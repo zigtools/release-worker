@@ -1,6 +1,6 @@
-import { env, SELF } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
 import assert from "node:assert";
-import { describe, test, expect, beforeAll } from "vitest";
+import { describe, test, expect, afterEach, beforeEach } from "vitest";
 import {
   D2JsonData,
   ReleaseArtifact,
@@ -177,7 +177,7 @@ async function selectZLSVersion(
   url.searchParams.set("zig_version", zigVersion);
   url.searchParams.set("compatibility", compatibility);
 
-  const response = await SELF.fetch(url);
+  const response = await exports.default.fetch(url);
   expect(response.status).toBe(200);
   return await response.json();
 }
@@ -191,9 +191,12 @@ function shuffleArray(array: unknown[]) {
 
 describe("/v1/zls/index.json", () => {
   test("check for redirect", async () => {
-    const response = await SELF.fetch("https://example.com/v1/zls/index.json", {
-      redirect: "manual",
-    });
+    const response = await exports.default.fetch(
+      "https://example.com/v1/zls/index.json",
+      {
+        redirect: "manual",
+      },
+    );
     expect(response.status).toBe(301);
     expect(response.headers.get("location")).toBe(
       `${env.R2_PUBLIC_URL}/index.json`,
@@ -202,8 +205,12 @@ describe("/v1/zls/index.json", () => {
 });
 
 describe("/v1/zls/select-version", () => {
+  afterEach(async () => {
+    await env.ZIGTOOLS_DB.exec("DELETE FROM ZLSReleases");
+  });
+
   test("method should be 'GET'", async () => {
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://example.com/v1/zls/select-version",
       {
         method: "POST",
@@ -230,7 +237,7 @@ describe("/v1/zls/select-version", () => {
   );
 
   test("missing zig version query", async () => {
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://example.com/v1/zls/select-version",
     );
     expect(await response.json()).toStrictEqual({
@@ -240,7 +247,7 @@ describe("/v1/zls/select-version", () => {
   });
 
   test("invalid zig version", async () => {
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://example.com/v1/zls/select-version?zig_version=foo",
     );
     expect(await response.json()).toStrictEqual({
@@ -251,7 +258,7 @@ describe("/v1/zls/select-version", () => {
   });
 
   test("missing compatibility query", async () => {
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://example.com/v1/zls/select-version?zig_version=0.11.0",
     );
     expect(await response.json()).toStrictEqual({
@@ -263,7 +270,7 @@ describe("/v1/zls/select-version", () => {
   test.each<string>(["", "foo", "none", "None", "OnlyRuntime", "Full"])(
     "invalid compatibility string: '%s'",
     async (compatibility) => {
-      const response = await SELF.fetch(
+      const response = await exports.default.fetch(
         `https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=${compatibility}`,
       );
       expect(await response.json()).toStrictEqual({
@@ -274,10 +281,10 @@ describe("/v1/zls/select-version", () => {
   );
 
   test("search on empty database with tagged Zig version", async () => {
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://example.com/v1/zls/select-version?zig_version=0.11.0&compatibility=full",
     );
-    expect(await response.json()).toStrictEqual<SelectVersionFailureResponse>({
+    expect(await response.json()).toStrictEqual({
       code: SelectVersionFailureCode.TaggedReleaseIncompatible,
       message: "ZLS 0.11 has not been released yet",
     });
@@ -285,10 +292,10 @@ describe("/v1/zls/select-version", () => {
   });
 
   test("search on empty database with development Zig version", async () => {
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       `https://example.com/v1/zls/select-version?zig_version=${encodeURIComponent("0.11.0-dev.1+aaaaaaaaa")}&compatibility=full`,
     );
-    expect(await response.json()).toStrictEqual<SelectVersionFailureResponse>({
+    expect(await response.json()).toStrictEqual({
       code: SelectVersionFailureCode.DevelopmentBuildUnsupported,
       message: "No builds for the 0.11 release cycle are currently available",
     });
@@ -296,7 +303,7 @@ describe("/v1/zls/select-version", () => {
   });
 
   describe("test on sample database", () => {
-    beforeAll(async () => {
+    beforeEach(async () => {
       await populateDatabase(samples);
     });
 
@@ -442,7 +449,7 @@ describe("/v1/zls/select-version", () => {
           zigVersion,
           VersionCompatibility.Full,
         );
-        expect(response).toStrictEqual<SelectVersionFailureResponse>({
+        expect(response).toStrictEqual({
           code: expectedCode,
           message: expectedError,
         });

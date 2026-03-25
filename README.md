@@ -1,4 +1,4 @@
-[![CI](https://github.com/zigtools/release-worker/workflows/CI/badge.svg)](https://github.com/zigtools/release-worker/actions)
+[![CI](https://github.com/zigtools/release-worker/actions/workflows/main.yml/badge.svg)](https://github.com/zigtools/release-worker/actions/workflows/main.yml)
 [![codecov](https://codecov.io/gh/zigtools/release-worker/graph/badge.svg?token=A3YHEUHMT2)](https://codecov.io/gh/zigtools/release-worker)
 
 A Cloudflare Worker for managing ZLS build artifacts.
@@ -482,6 +482,7 @@ Artifacts that target windows must be `.zip` files. All other non windows target
 git clone https://github.com/zigtools/release-worker
 cd release-worker
 npm install
+npm run cf-typegen
 npx wrangler d1 execute staging-db-backend --local --file=./migrations/0000_initial.sql
 npm run dev
 ```
