@@ -155,7 +155,7 @@ The version selection algorithm has identified the given Zig version as incompat
 ```json
 {
   "code": 2,
-  "message": "Zig ${ZIG_VERSION} has no compatible ZLS build (yet)"
+  "message": "Zig 0.X.Y has no compatible ZLS build (yet)"
 }
 ```
 
@@ -166,11 +166,23 @@ This error only occurs on development/nightly builds of Zig.
 ```json
 {
   "code": 3,
-  "message": "ZLS ${ZIG_MAJOR_VERSION}.${ZIG_MINOR_VERSION} has not been released yet"
+  "message": "ZLS 0.X has not been released yet"
 }
 ```
 
 This error only occurs on tagged releases of Zig.
+
+#### Unsupported minor version
+
+The given Zig version is unsupported because the `0.X` ZLS release cycle requires a higher minor version.
+Example, Zig `0.15.0` is unsupported because ZLS `0.15.0` requires Zig `0.15.1`.
+
+```json
+{
+  "code": 4,
+  "message": "Zig 0.X.Y is unsupported. The ZLS 0.X release cycle requires at least Zig 0.X.Y"
+}
+```
 
 </details>
 
