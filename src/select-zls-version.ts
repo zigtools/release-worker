@@ -188,7 +188,7 @@ async function selectOnTaggedRelease(
       assert(minRuntimeZigVersion.patch > zigVersion.patch);
       return {
         code: SelectVersionFailureCode.TaggedReleaseUnsupportedMinorVersion,
-        message: `Zig ${zigVersion.toString()} is unsupported. The ZLS ${minRuntimeZigVersion.major.toString()}.${minRuntimeZigVersion.minor.toString()} release cycle requires at least Zig ${minRuntimeZigVersion.toString()}`,
+        message: `Zig ${zigVersion.toString()} is unsupported by ZLS. The ZLS ${minRuntimeZigVersion.major.toString()}.${minRuntimeZigVersion.minor.toString()} release cycle requires at least Zig ${minRuntimeZigVersion.toString()}`,
       };
     } else {
       return {

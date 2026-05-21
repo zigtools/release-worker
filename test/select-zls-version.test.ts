@@ -481,7 +481,7 @@ describe("/v1/zls/select-version", () => {
         SelectVersionFailureCode.TaggedReleaseUnsupportedMinorVersion,
       );
       expect(response.message).toBe(
-        "Zig 0.15.0 is unsupported. The ZLS 0.15 release cycle requires at least Zig 0.15.1",
+        "Zig 0.15.0 is unsupported by ZLS. The ZLS 0.15 release cycle requires at least Zig 0.15.1",
       );
     }
 
