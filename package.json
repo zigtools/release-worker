@@ -15,7 +15,7 @@
     "lint": "eslint"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/vitest-plugin": "^1.0.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.3",
     "@vitest/coverage-istanbul": "^4.1.0",
