@@ -9,7 +9,7 @@ import {
   artifactsToRecord,
   targetFormat,
 } from "./shared";
-import { SemanticVersion } from "./semantic-version";
+import { Order, SemanticVersion } from "./semantic-version";
 
 export interface PublishRequest {
   zlsVersion: string;
@@ -531,8 +531,6 @@ export async function handlePublish(
 
   if (artifactsAlreadyExist) return new Response();
 
-  const promises: Promise<unknown>[] = [];
-
   {
     const index: ZLSIndex = {};
 
@@ -544,20 +542,35 @@ export async function handlePublish(
       };
     }
 
-    promises.push(
-      env.ZIGTOOLS_BUILDS.put(
-        "index.json",
-        JSON.stringify(index, undefined, 2),
-        {
-          httpMetadata: {
-            contentType: "application/json",
-          },
+    const sortedIndex = Object.keys(index)
+      .sort((lhs, rhs) => {
+        const lhsVersion = SemanticVersion.parse(lhs);
+        const rhsVersion = SemanticVersion.parse(rhs);
+        assert(lhsVersion != null && rhsVersion != null);
+        switch (SemanticVersion.order(lhsVersion, rhsVersion)) {
+          case Order.lt:
+            return 1;
+          case Order.eq:
+            return 0;
+          case Order.gt:
+            return -1;
+        }
+      })
+      .reduce<ZLSIndex>((obj, key) => {
+        obj[key] = index[key];
+        return obj;
+      }, {});
+
+    await env.ZIGTOOLS_BUILDS.put(
+      "index.json",
+      JSON.stringify(sortedIndex, undefined, 2),
+      {
+        httpMetadata: {
+          contentType: "application/json",
         },
-      ),
+      },
     );
   }
-
-  ctx.waitUntil(Promise.all(promises));
 
   return new Response();
 }

@@ -127,6 +127,7 @@ function getSampleArtifacts(version: string): Record<string, ArtifactMetadata> {
 describe("/v1/zls/publish", () => {
   afterEach(async () => {
     await env.ZIGTOOLS_DB.exec("DELETE FROM ZLSReleases");
+    await env.ZIGTOOLS_BUILDS.delete("index.json");
   });
 
   test("expect POST method", async () => {
@@ -857,6 +858,45 @@ describe("/v1/zls/publish", () => {
     });
     expect(await response.text()).toBe("");
     expect(response.status).toBe(200);
+  });
+
+  test("versions are sorted index.json", async () => {
+    {
+      const response = await sendPublish({
+        zlsVersion: "0.15.0",
+        zigVersion: "0.15.0",
+        artifacts: {
+          "zls-aarch64-windows-0.15.0.zip": {
+            shasum: "a".repeat(64),
+            size: 1,
+          },
+        },
+      });
+      expect(await response.text()).toBe("");
+      expect(response.status).toBe(200);
+    }
+
+    {
+      const response = await sendPublish({
+        zlsVersion: "0.16.0",
+        zigVersion: "0.16.0",
+        artifacts: {
+          "zls-aarch64-windows-0.16.0.zip": {
+            shasum: "b".repeat(64),
+            size: 2,
+          },
+        },
+      });
+      expect(await response.text()).toBe("");
+      expect(response.status).toBe(200);
+    }
+
+    const response = await env.ZIGTOOLS_BUILDS.get("index.json");
+    assert(response !== null);
+
+    const zlsIndex = await response.json<ZLSIndex>();
+
+    expect(Object.keys(zlsIndex)).toStrictEqual(["0.16.0", "0.15.0"]);
   });
 
   test("disallow publishing a failed tagged release", async () => {
